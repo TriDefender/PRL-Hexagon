@@ -1,0 +1,13 @@
+typedef octet byte;
+module prl_fused {
+  interface fused {
+    struct HashParams { long keys[32]; long bound[8]; };
+    long run(in long m, in long n, in long flags,
+             in sequence<byte> X, in sequence<byte> Wk,
+             rout sequence<long> tt, rout unsigned long long cycles);
+    long run_hash(in long m, in long n, in long flags, in long output_mode,
+                  in sequence<byte> X, in sequence<byte> Wk,
+                  in HashParams params, rout sequence<long> results,
+                  rout unsigned long long cycles);
+  };
+};
