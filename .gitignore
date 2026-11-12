@@ -1,0 +1,15 @@
+# Build outputs and downloaded toolchains (never commit binaries).
+/build/
+/payloads/
+/out/
+/deps/
+/app/.gradle/
+/app/app/build/
+/app/build/
+/app/local.properties
+*.apk
+*.so
+*.o
+*.a
+*.log
+__pycache__/
