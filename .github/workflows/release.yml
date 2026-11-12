@@ -1,0 +1,136 @@
+name: Release APK
+
+# Manual release: pick a branch, give a new v* tag, approve the environment
+# review request — the workflow builds every payload from source, tags the
+# built commit, signs the APK with the environment secrets and publishes.
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "New release tag, e.g. v1.0.0"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+env:
+  # Plain variable wins; a private mirror can be provided as a secret of the same name.
+  HEXKL_URL: ${{ vars.HEXKL_URL || secrets.HEXKL_URL }}
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    # The signing secrets live in this environment; its required reviewer
+    # gate makes every run need a manual approval before secrets are read.
+    environment: release
+    env:
+      HEXAGON_SDK_ROOT: ${{ github.workspace }}/deps/hexagon-sdk/6.3.0.0
+      HEXKL_ROOT: ${{ github.workspace }}/deps/hexkl/hexkl_addon
+      ANDROID_NDK_ROOT: ${{ github.workspace }}/deps/android-ndk-r27c
+    steps:
+      - name: Validate tag
+        env:
+          TAG: ${{ inputs.tag }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          printf '%s' "$TAG" | grep -qE '^v[0-9]' || { echo "::error::Tag must look like v1.0.0 (got '$TAG')"; exit 1; }
+          ! gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${TAG}" >/dev/null 2>&1 || { echo "::error::Tag '$TAG' already exists"; exit 1; }
+
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools'
+
+      - name: Install Android SDK packages
+        run: sdkmanager "platforms;android-36" "build-tools;35.0.0"
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.5'
+
+      - name: Cache toolchain downloads
+        uses: actions/cache@v4
+        with:
+          path: |
+            deps/hexagon-sdk.tar.xz
+            deps/android-ndk.zip
+            deps/hexkl/hexkl.zip
+          key: toolchain-hexsdk630-ndkr27c-v1-${{ env.HEXKL_URL }}
+
+      - name: Fetch toolchains
+        run: bash scripts/fetch-deps.sh
+
+      - name: Build DSP skeletons
+        run: bash scripts/build-dsp.sh
+
+      - name: Build miner
+        run: bash scripts/build-miner.sh
+
+      - name: Host tests (sanitizers)
+        run: |
+          for t in miner/tests/test_*.py dsp/compound/test_*.py; do
+            [ -e "$t" ] || continue
+            python3 -I "$t"
+          done
+
+      - name: Assemble APK (signed release when keystore secrets exist)
+        env:
+          APK_KEYSTORE_B64: ${{ secrets.APK_KEYSTORE_B64 }}
+          APK_KEYSTORE_PASSWORD: ${{ secrets.APK_KEYSTORE_PASSWORD }}
+          APK_KEY_ALIAS: ${{ secrets.APK_KEY_ALIAS }}
+          APK_KEY_PASSWORD: ${{ secrets.APK_KEY_PASSWORD }}
+        run: |
+          if [[ -z "$APK_KEYSTORE_B64" ]]; then
+            bash scripts/build-apk.sh debug
+            exit 0
+          fi
+          echo "$APK_KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/release.keystore"
+          export KEYSTORE_FILE="$RUNNER_TEMP/release.keystore"
+          export KEYSTORE_PASSWORD="$APK_KEYSTORE_PASSWORD"
+          export KEY_ALIAS="$APK_KEY_ALIAS"
+          export KEY_PASSWORD="$APK_KEY_PASSWORD"
+          bash scripts/build-apk.sh release
+
+      - name: Create tag on the built commit
+        env:
+          TAG: ${{ inputs.tag }}
+          GH_TOKEN: ${{ github.token }}
+        run: gh api "repos/${GITHUB_REPOSITORY}/git/refs" -f ref="refs/tags/${TAG}" -f sha="${GITHUB_SHA}"
+
+      - name: Collect release files
+        env:
+          TAG: ${{ inputs.tag }}
+        run: |
+          mkdir -p dist
+          apk=$(find out -name '*.apk' | head -1)
+          variant=release
+          if [[ "$apk" == *debug* ]]; then variant=debug; fi
+          mv "$apk" "dist/prl-npu-miner-${TAG}-${variant}.apk"
+          sha256sum payloads/*.so dist/*.apk > dist/SHA256SUMS
+          {
+            echo "## prl-npu-miner ${TAG} (${GITHUB_REF_NAME})"
+            echo
+            echo "APK built from source in CI; DSP skeletons compiled with Hexagon SDK 6.3.0 (Tools 19.0.04), miner with Android NDK r27c."
+            echo
+            echo '```'
+            cat dist/SHA256SUMS
+            echo '```'
+            echo
+            echo "Requires a Snapdragon 8 Elite class device (Hexagon v79 cDSP with HVX+HMX) running Android 12+. The app runs an on-device selftest on first launch."
+          } > dist/release-notes.md
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.tag }}
+          body_path: dist/release-notes.md
+          files: |
+            dist/*.apk
+            dist/SHA256SUMS
