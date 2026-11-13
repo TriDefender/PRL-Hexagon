@@ -550,7 +550,7 @@ fun Dashboard(
     val settingsScroll = rememberLazyListState()
 
     val cfg = MineConfig(pool.trim(), wallet.trim(), worker.trim(), dialect, pplns)
-    val cfgValid = validPool(cfg.pool) && validWallet(cfg.wallet) && validWorker(cfg.worker)
+    val cfgValid = validPool(cfg.pool) && validWallet(cfg.wallet, dialect) && validWorker(cfg.worker)
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
 
@@ -567,7 +567,7 @@ fun Dashboard(
 
     val startMining: () -> Unit = {
         if (!cfgValid) {
-            onEvent("请先填写正确的矿池地址和钱包地址")
+            onEvent("请先填写正确的矿池地址和钱包/用户名")
         } else {
             graph.store.save(cfg)
             try {
@@ -641,14 +641,27 @@ fun Dashboard(
                     Spacer(Modifier.height(4.dp))
                     OutlinedTextField(
                         value = wallet, onValueChange = { wallet = it },
-                        label = { Text("收款钱包地址") },
-                        placeholder = { Text(Store.WALLET_HINT) },
+                        label = {
+                            Text(
+                                if (dialect == "kryptex") "矿池用户名 / 钱包地址"
+                                else "收款钱包地址"
+                            )
+                        },
+                        placeholder = {
+                            Text(
+                                if (dialect == "kryptex") "用户名或 prl1..."
+                                else Store.WALLET_HINT
+                            )
+                        },
                         singleLine = true,
                         shape = MaterialTheme.shapes.medium,
-                        isError = wallet.isNotBlank() && !validWallet(wallet.trim()),
+                        isError = wallet.isNotBlank() && !validWallet(wallet.trim(), dialect),
                         supportingText = {
-                            if (wallet.isNotBlank() && !validWallet(wallet.trim())) {
-                                Text("钱包地址通常以 prl1 开头")
+                            if (wallet.isNotBlank() && !validWallet(wallet.trim(), dialect)) {
+                                Text(
+                                    if (dialect == "kryptex") "请填写矿池用户名或钱包地址"
+                                    else "钱包地址通常以 prl1 开头"
+                                )
                             }
                         },
                         modifier = Modifier.fillMaxWidth(),
@@ -1212,8 +1225,14 @@ private fun ShareStat(label: String, value: Long, color: Color, modifier: Modifi
 fun validPool(s: String): Boolean =
     Regex("^(tls://)?[A-Za-z0-9._\\-]+:\\d{1,5}$").matches(s)
 
-fun validWallet(s: String): Boolean =
-    Regex("^[a-z0-9]{10,80}$").matches(s)
+fun validWallet(s: String, dialect: String): Boolean =
+    if (dialect == "kryptex") {
+        // Kryptex accepts an account username (often an email) as the -u value;
+        // keep it shell-safe because the runner passes it through a script.
+        Regex("^[A-Za-z0-9._@+\\-]{1,120}$").matches(s)
+    } else {
+        Regex("^[a-z0-9]{10,80}$").matches(s)
+    }
 
 fun validWorker(s: String): Boolean =
     Regex("^[A-Za-z0-9._\\-]{1,30}$").matches(s)

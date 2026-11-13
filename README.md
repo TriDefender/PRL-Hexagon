@@ -30,7 +30,8 @@
 - 系统：Android 12（API 31）及以上，arm64
 - 设备需带 `libcdsprpc.so` 与 `/dev/fastrpc-cdsp`（8 Elite 机型默认都有）
 
-App 每次启动都会自检：SoC 厂商/型号、FastRPC 运行库、APK 载荷完整性，并跑一次 **CPU + Hexagon HMX 对官方 golden 向量的逐位自检**。
+App 每次启动都会自检：SoC 厂商/型号、FastRPC 运行库、APK 载荷完整性，并跑一次 **CPU + Hexagon HMX 对官方 golden 向量的逐位自检**；
+随后对实际 compound 内核跑一次无网络的 app-check（2 jobs / 4 batches / 128 nonces）。
 任何一项失败都会显示“此机型不支持”并禁用挖矿，不会在错误硬件上计算。
 
 ## 安装
@@ -41,7 +42,7 @@ App 每次启动都会自检：SoC 厂商/型号、FastRPC 运行库、APK 载�
 
 ## 使用
 
-1. 输入矿池地址（stratum，如 `pool.example.net:3333`）、PRL 钱包地址（`prl1p...`）、worker 名
+1. 输入矿池地址（stratum，如 `pool.example.net:3333`）、PRL 钱包地址（`prl1p...`；Kryptex 协议下也可填矿池用户名/邮箱）、worker 名
 2. PPS+/PPLNS 只是本地记忆的偏好，PPLNS 时 worker 名追加 `.pplns`；实际结算方式以矿池网页端设置为准
 3. 点击“开始挖矿”，阅读风险提示，勾选确认并等待 5 秒后启动
 4. 仪表盘实时显示算力、温度与份额计数；通知栏常驻前台服务显示当前算力
@@ -64,7 +65,7 @@ scripts/         构建脚本（取依赖、DSP、矿工、APK）
 .github/         CI：从源码构建全部载荷并产出/发布 APK
 ```
 
-App 内置三个原生载荷（`libprlminer.so`、两个 DSP skeleton），全部由 CI 从源码编译，仓库不含任何二进制产物。
+App 内置三个挖矿载荷（`libprlminer.so`、两个 DSP skeleton）和一个 app-check 检查器，全部由 CI 从源码编译，仓库不含任何二进制产物。
 miner 每秒输出一次统计行；compound RPC 带 fail-fast 保护，任何 RPC 错误都会停止挖矿而不是提交伪结果。
 
 ## 从源码构建
