@@ -1,0 +1,12 @@
+[
+  {
+    "mode": 0,
+    "sha256": "d88089003c5254664f90c513957f33e6092666a434963385fc443280ae7d3f02",
+    "matches_frozen_tested_object": true
+  },
+  {
+    "mode": 1,
+    "sha256": "069758121dec040da8406c6dd29047ee65b52cbe85dd7a989443b36cf6f597c7",
+    "matches_frozen_tested_object": true
+  }
+]

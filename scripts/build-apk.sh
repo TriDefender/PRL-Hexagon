@@ -7,6 +7,8 @@ VARIANT="${1:-release}"
 JLIBS="$ROOT/app/app/src/main/jniLibs/arm64-v8a"
 
 source "$ROOT/dsp/compound/build.conf"
+python3 "$ROOT/scripts/check-dsp-elf.py" \
+  "$OUT/libprl_fused_fused_skel.so" "$OUT/$PRL_SKEL_LIB"
 for f in libprlminer.so libprl_fused_fused_skel.so "$PRL_SKEL_LIB"; do
   [[ -f "$OUT/$f" ]] || { echo "missing payloads/$f (run build-dsp.sh and build-miner.sh)" >&2; exit 1; }
 done

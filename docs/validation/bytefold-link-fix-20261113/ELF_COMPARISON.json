@@ -1,0 +1,23 @@
+[
+  {
+    "case": "published_before",
+    "sha256": "980dd7806a762de292a38a0a64875305e380e3474415ce600667c346f2af866f",
+    "size": 122536,
+    "undefined_hexkl_imports": [
+      "hexkl_micro_hmx_acc_clear_int32",
+      "hexkl_micro_hmx_acc_read_int32",
+      "hexkl_micro_hmx_config_size",
+      "hexkl_micro_hmx_lock",
+      "hexkl_micro_hmx_mm_u8i8",
+      "hexkl_micro_hmx_rm_to_wh_i8",
+      "hexkl_micro_hmx_setup_acc_read_int32",
+      "hexkl_micro_hw_init"
+    ]
+  },
+  {
+    "case": "fixed",
+    "sha256": "e6447377cfa1a22b25b7589366df93900fba3379b54cdb32d556925415caf0a1",
+    "size": 153192,
+    "undefined_hexkl_imports": []
+  }
+]

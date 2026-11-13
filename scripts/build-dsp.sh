@@ -20,8 +20,11 @@ HEXFLAGS=(
   -I"$SDK/ipc/fastrpc/remote/ship/inc" -I"$HK/include" -I"$UDMA/api" -I"$UDMA/inc"
 )
 LINKFLAGS=(-mv79 -mhvx -mhmx -mhvx-length=128B -G0 -fPIC
-  -Wl,-Bsymbolic -Wl,--exclude-libs,ALL -Wl,--start-group
-  "$HK/lib/6.3.0.0/hexagon_toolv88_v79/libhexkl_micro.a" -Wl,--end-group -lc -shared)
+  -Wl,-Bsymbolic -Wl,--exclude-libs,ALL -shared)
+# Static archives must follow the objects that reference them. Firmware does
+# not supply HexKL: unresolved hexkl_* imports are a broken payload.
+LINKLIBS=(-Wl,--start-group
+  "$HK/lib/6.3.0.0/hexagon_toolv88_v79/libhexkl_micro.a" -Wl,--end-group -lc)
 KERNEL_COMMON=(-Dprl_fused_fused_run=prl_compound_kernel_run
   -Dprl_fused_fused_run_hash=prl_compound_kernel_run_hash)
 
@@ -36,7 +39,7 @@ echo "== fused skeleton (selftest/fallback path) =="
   -DPRL_HMX_CLOCK_POLICY=1 -DPRL_AUTO_WORKERS=1 -DPRL_DIAGNOSTIC_PROFILE=0 \
   -I"$BUILD/gen_fused" -I"$ROOT/dsp/fused" \
   "$BUILD/gen_fused/prl_fused_fused_skel.c" "$ROOT/dsp/fused/fused_impl.c" \
-  "$UDMA/src/dma_utils.c" "${LINKFLAGS[@]}" -o "$OUT/libprl_fused_fused_skel.so"
+  "$UDMA/src/dma_utils.c" "${LINKFLAGS[@]}" "${LINKLIBS[@]}" -o "$OUT/libprl_fused_fused_skel.so"
 
 echo "== compound skeleton ($PRL_SERVICE) =="
 "$QAIC" "$ROOT/dsp/compound/compound.idl" -o "$BUILD/gen"
@@ -54,7 +57,7 @@ compile_kernel() { # $1 = object file, remaining args = extra defines
 }
 link_kernel() { # $1 = kernel object, $2 = output .so
   "$HEX" "${LINKFLAGS[@]}" "$BUILD/dsp/skel.o" "$BUILD/dsp/compound.o" "$1" \
-    "$BUILD/dsp/dma.o" -o "$2"
+    "$BUILD/dsp/dma.o" "${LINKLIBS[@]}" -o "$2"
 }
 
 if (( ${#PRL_KERNEL_MODES[@]} == 0 )); then
@@ -68,6 +71,9 @@ else
     fi
   done
 fi
+
+python3 "$ROOT/scripts/check-dsp-elf.py" \
+  "$OUT/libprl_fused_fused_skel.so" "$OUT/$PRL_SKEL_LIB"
 
 echo "== payload hashes =="
 sha256sum "$OUT"/*.so
