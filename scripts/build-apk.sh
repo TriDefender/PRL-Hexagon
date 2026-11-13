@@ -7,12 +7,13 @@ VARIANT="${1:-release}"
 JLIBS="$ROOT/app/app/src/main/jniLibs/arm64-v8a"
 
 source "$ROOT/dsp/compound/build.conf"
-for f in libprlminer.so libprl_fused_fused_skel.so "$PRL_SKEL_LIB"; do
+for f in libprlminer.so libprl_fused_fused_skel.so "$PRL_SKEL_LIB" app-check; do
   [[ -f "$OUT/$f" ]] || { echo "missing payloads/$f (run build-dsp.sh and build-miner.sh)" >&2; exit 1; }
 done
 
 rm -f "$JLIBS"/*.so
 cp "$OUT/libprlminer.so" "$OUT/libprl_fused_fused_skel.so" "$OUT/$PRL_SKEL_LIB" "$JLIBS/"
+cp "$OUT/app-check" "$JLIBS/libprlappcheck.so"
 
 cd "$ROOT/app"
 if [[ -x ./gradlew ]]; then GRADLE=./gradlew; else GRADLE=gradle; fi

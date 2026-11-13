@@ -41,14 +41,18 @@ class MinerRunner(ctx: Context) {
     val workDir: File get() = File(appCtx.filesDir, "work")
     val nativeDir: String get() = appCtx.applicationInfo.nativeLibraryDir
     val minerBin: File get() = File(nativeDir, MINER)
+    val appCheckBin: File get() = File(nativeDir, APPCHECK)
     val goldenFile: File get() = File(workDir, GOLDEN)
     private val pidFile: File get() = File(workDir, "miner.pid")
 
     val skelNames = listOf(FUSED_SKEL, COMPOUND_SKEL)
 
     val payloadReady: Boolean
-        get() = minerBin.exists() && minerBin.canExecute() &&
-                skelNames.all { File(nativeDir, it).exists() }
+        get() {
+            if (!minerBin.exists() || !minerBin.canExecute()) return false
+            if (!skelNames.all { File(nativeDir, it).exists() }) return false
+            return appCheckBin.exists() && appCheckBin.canExecute()
+        }
 
     /** Copy the golden vectors into app-private storage and verify the payload. */
     fun prepare(): Boolean {
@@ -120,6 +124,51 @@ class MinerRunner(ctx: Context) {
         val text = synchronized(out) { out.toString() }
         val ok = p.exitValue() == 0 && text.contains("selftest PASSED")
         return ok to if (ok) "CPU + Hexagon HMX 位精确校验通过" else text.takeLast(800)
+    }
+
+    /**
+     * Real compound-kernel check on the bundled bytefold skeleton — the same
+     * module the miner uses for actual work.  The fused golden selftest above
+     * cannot catch a compound-only load/resource failure, so run the
+     * no-network adapter checker (2 jobs, 4 batches, 128 attempts).
+     */
+    fun selftestCompound(timeoutSec: Long = 90): Pair<Boolean, String> {
+        if (!prepare()) return false to "挖矿组件缺失，请重新安装应用"
+        val appCheck = appCheckBin
+        val script = writeScript(
+            "compound_check.sh",
+            buildString {
+                append("cd '$nativeDir' || exit 41\n")
+                append(envExports())
+                append("exec '${appCheck.absolutePath}'\n")
+            },
+        )
+        val p = try {
+            ProcessBuilder("sh", script.absolutePath).redirectErrorStream(true).start()
+        } catch (_: Exception) {
+            return false to "无法启动复合内核检查"
+        }
+        val out = StringBuilder()
+        val reader = Thread {
+            try {
+                p.inputStream.bufferedReader().forEachLine { line ->
+                    synchronized(out) { out.appendLine(line) }
+                }
+            } catch (_: Exception) { /* process destroyed */ }
+        }.apply { isDaemon = true; start() }
+        val finished = try {
+            p.waitFor(timeoutSec, TimeUnit.SECONDS)
+        } catch (_: InterruptedException) {
+            false
+        }
+        if (!finished) {
+            p.destroyForcibly()
+            return false to "复合内核检查超时"
+        }
+        reader.join(1500)
+        val text = synchronized(out) { out.toString() }
+        val ok = p.exitValue() == 0 && text.contains("APP_CHECK_PASSED")
+        return ok to if (ok) "复合内核校验通过" else text.takeLast(1200)
     }
 
     fun start(cfg: MineConfig): Boolean {
@@ -286,6 +335,7 @@ class MinerRunner(ctx: Context) {
         const val MINER = "libprlminer.so"
         const val FUSED_SKEL = "libprl_fused_fused_skel.so"
         const val COMPOUND_SKEL = "libprl_compound_bytefold_batch_skel.so"
+        const val APPCHECK = "libprlappcheck.so"
         const val GOLDEN = "golden.txt"
     }
 }

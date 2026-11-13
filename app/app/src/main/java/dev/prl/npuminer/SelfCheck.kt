@@ -26,6 +26,7 @@ data class SelfCheckState(
             CheckItem("hex", "NPU 加速"),
             CheckItem("payload", "挖矿组件"),
             CheckItem("golden", "计算校验"),
+            CheckItem("compound", "复合内核"),
         )
     }
 }
@@ -127,6 +128,26 @@ class SelfCheck(private val miner: MinerRunner) {
             )
         }
         if (!ok) android.util.Log.i("PrlCheck", "golden raw output: $msg")
+
+        // 6. Real compound-kernel check on the same bytefold module the miner
+        //    uses.  The fused golden test above cannot catch a compound-only
+        //    load/resource failure on another device.
+        item("compound") { it.copy(result = CheckResult.RUNNING) }
+        var (cok, cmsg) = miner.selftestCompound()
+        if (!cok) {
+            Thread.sleep(1200)
+            val retry = miner.selftestCompound()
+            cok = retry.first
+            cmsg = retry.second
+        }
+        item("compound") {
+            it.copy(
+                result = if (cok) CheckResult.PASS else CheckResult.FAIL,
+                detail = if (cok) "复合内核校验通过，这台手机可以挖矿"
+                else "复合内核校验失败；这台手机可能不支持该内核，或组件版本不匹配",
+            )
+        }
+        if (!cok) android.util.Log.i("PrlCheck", "compound raw output: $cmsg")
 
         return finish(st, onProgress)
     }
