@@ -1,4 +1,4 @@
-package dev.prl.npuminer
+package com.tridefender.npupearl
 
 import android.Manifest
 import android.content.Intent

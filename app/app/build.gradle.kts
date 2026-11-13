@@ -4,12 +4,12 @@ plugins {
 }
 
 android {
-    namespace = "dev.prl.npuminer"
+    namespace = "com.tridefender.npupearl"
     compileSdk = 36
     buildToolsVersion = "35.0.0"
 
     defaultConfig {
-        applicationId = "dev.prl.npuminer"
+        applicationId = "com.tridefender.npupearl"
         minSdk = 31
         targetSdk = 34
         versionCode = 8

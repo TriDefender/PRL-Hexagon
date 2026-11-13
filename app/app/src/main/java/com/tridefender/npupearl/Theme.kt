@@ -1,4 +1,4 @@
-package dev.prl.npuminer
+package com.tridefender.npupearl
 
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme

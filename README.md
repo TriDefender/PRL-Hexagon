@@ -106,11 +106,16 @@ CI 开箱即用；如需改用自备镜像，可在 Settings → Secrets and var
 
 说明：Hexagon 链接器输出非字节级确定（PLT 顺序随机），不同机器/不同次构建的 .so 哈希不同属正常现象；每个 Release 附带本次构建的 SHA256SUMS。
 
+### 应用标识与图标
+
+应用包名为 `com.tridefender.npupearl`。更换包名后 Android 会将其视为独立应用，旧包的设置不会自动迁移。
+启动图标采用手绘 PRL 字母组合，支持自适应裁切与 Android 13+ 单色主题图标；源图和设计说明见 `app/design/ICON.md`。
+
 ### 设备上手动验证
 
 ```bash
 adb install -r out/prl-npu-miner-*.apk
-adb shell am start -n dev.prl.npuminer/.MainActivity
+adb shell am start -n com.tridefender.npupearl/.MainActivity
 ```
 
 `miner/tests/` 内含官方 golden 向量与 mock 矿池（`mockpool.py`），可在推送前做离线校验。
