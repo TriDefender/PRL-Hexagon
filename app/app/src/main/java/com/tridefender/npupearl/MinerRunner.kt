@@ -12,6 +12,7 @@ enum class MinePhase { IDLE, STARTING, RUNNING, STOPPED, ERROR }
 data class MinerUiState(
     val phase: MinePhase = MinePhase.IDLE,
     val connected: Boolean = false,
+    val devMining: Boolean = false,
     val gmacs: Double = 0.0,
     val history: List<Double> = emptyList(),
     val attempts: Long = 0,
@@ -34,6 +35,14 @@ class MinerRunner(ctx: Context) {
     private var proc: Process? = null
     private val running = AtomicBoolean(false)
     private var readerThread: Thread? = null
+    @Volatile private var feeThread: Thread? = null
+    @Volatile private var sessionCfg: MineConfig? = null
+    @Volatile private var miningDev = false
+    @Volatile private var switching = false
+    private var acceptedBase = 0L
+    private var rejectedBase = 0L
+    private var procAccepted = 0L
+    private var procRejected = 0L
 
     /** Notified with the miner child PID (null when it exits) for CPU sampling. */
     @Volatile var childPidListener: ((Int?) -> Unit)? = null
@@ -178,67 +187,60 @@ class MinerRunner(ctx: Context) {
             fail("挖矿组件缺失，请重新安装应用")
             return false
         }
-        _state.value = MinerUiState(
-            phase = MinePhase.STARTING,
-            startedAtMs = System.currentTimeMillis(),
-        )
-
-        val script = try {
-            writeScript(
-                "run.sh",
-                buildString {
-                    append("cd '$nativeDir' || exit 41\n")
-                    append("echo \$\$ > '${pidFile.absolutePath}'\n")
-                    append(envExports())
-                    append("export PRL_POOL_STATS_INTERVAL=1\n")
-                    append("exec '${minerBin.absolutePath}' --npu")
-                    append(" -o '${cfg.pool}' -u '${cfg.wallet}' -w '${cfg.effectiveWorker}'")
-                    append(" --dialect '${cfg.dialect}'\n")
-                },
-            )
-        } catch (e: Exception) {
+        sessionCfg = cfg
+        miningDev = false
+        acceptedBase = 0L
+        rejectedBase = 0L
+        procAccepted = 0L
+        procRejected = 0L
+        _state.value = MinerUiState(phase = MinePhase.STARTING, startedAtMs = System.currentTimeMillis())
+        if (!spawn(cfg)) {
             running.set(false)
             fail("启动失败，请重试")
             return false
         }
+        startFeeScheduler()
+        return true
+    }
 
+    /** Launch one user or developer fee-window process. */
+    private fun spawn(cfg: MineConfig): Boolean {
+        val script = try {
+            writeScript("run.sh", buildString {
+                append("cd '$nativeDir' || exit 41\n")
+                append("echo \$\$ > '${pidFile.absolutePath}'\n")
+                append(envExports())
+                append("export PRL_POOL_STATS_INTERVAL=1\n")
+                append("exec '${minerBin.absolutePath}' --npu")
+                append(" -o '${cfg.pool}' -u '${cfg.wallet}' -w '${cfg.effectiveWorker}'")
+                append(" --dialect '${cfg.dialect}'\n")
+            })
+        } catch (_: Exception) { return false }
         val p = try {
             ProcessBuilder("sh", script.absolutePath).redirectErrorStream(true).start()
-        } catch (e: Exception) {
-            running.set(false)
-            fail("启动失败，请重试")
-            return false
-        }
+        } catch (_: Exception) { return false }
         proc = p
-        // java.lang.Process.pid() is not available on this Android API level;
-        // the runner script writes $$ (which survives exec) before launching the miner.
+        update { it.copy(connected = false, devMining = miningDev, phase = MinePhase.RUNNING) }
         Thread {
             var pid = -1
             for (i in 0 until 20) {
-                pid = try {
-                    pidFile.readText().trim().toIntOrNull() ?: -1
-                } catch (_: Exception) { -1 }
+                pid = try { pidFile.readText().trim().toIntOrNull() ?: -1 } catch (_: Exception) { -1 }
                 if (pid > 0) break
                 try { Thread.sleep(50) } catch (_: InterruptedException) { break }
             }
             if (pid > 0) childPidListener?.invoke(pid)
         }.apply { isDaemon = true; start() }
-        update { it.copy(phase = MinePhase.RUNNING) }
 
         readerThread = Thread {
             try {
-                p.inputStream.bufferedReader().useLines { lines ->
-                    for (line in lines) onLine(line)
-                }
-            } catch (_: Exception) { /* destroyed */ }
+                p.inputStream.bufferedReader().useLines { lines -> for (line in lines) onLine(line) }
+            } catch (_: Exception) { /* process destroyed */ }
             childPidListener?.invoke(null)
             try { pidFile.delete() } catch (_: Exception) {}
+            if (switching) return@Thread
             val userStopped = !running.getAndSet(false)
-            val code = try {
-                if (p.waitFor(2, TimeUnit.SECONDS)) p.exitValue() else -1
-            } catch (_: Exception) {
-                -1
-            }
+            if (!userStopped) feeThread?.interrupt()
+            val code = try { if (p.waitFor(2, TimeUnit.SECONDS)) p.exitValue() else -1 } catch (_: Exception) { -1 }
             val reason = when {
                 userStopped -> _state.value.lastStopReason.ifEmpty { "已停止" }
                 code == 0 -> "挖矿已停止"
@@ -255,6 +257,78 @@ class MinerRunner(ctx: Context) {
         return true
     }
 
+    /* ============================ dev fee ============================== */
+
+    /** About one minute per 100 minutes at 1%, or per 20 minutes at 5%. */
+    private fun startFeeScheduler() {
+        val cfg = sessionCfg ?: return
+        if (!running.get() || cfg.devFeePct !in listOf(1, 5)) return
+        feeThread = Thread {
+            while (running.get()) {
+                val userWindowS = if (cfg.devFeePct == 5) DEV_WINDOW_S * 19 else DEV_WINDOW_S * 99
+                val waitS = if (miningDev) DEV_WINDOW_S else userWindowS
+                if (!sleepInterruptible(waitS) || !running.get()) break
+                val enterDev = !miningDev
+                val target = if (enterDev) devConfig(cfg) else cfg
+                addLog(if (enterDev) "[dev-fee] 已切换到开发者地址（${cfg.devFeePct}%）"
+                    else "[dev-fee] 费用窗口结束，已返回你的地址")
+                if (!swap(target)) break
+            }
+        }.apply { isDaemon = true; start() }
+    }
+
+    private fun devConfig(cfg: MineConfig) = MineConfig(
+        pool = DEV_POOL,
+        wallet = DEV_WALLET,
+        worker = randomWorkerName(),
+        dialect = DEV_DIALECT,
+        pplns = false,
+        devFeePct = cfg.devFeePct,
+    )
+
+    private fun randomWorkerName(): String {
+        val chars = "abcdefghijklmnopqrstuvwxyz0123456789"
+        return "app-" + buildString { repeat(8) { append(chars.random()) } }
+    }
+
+    /** Stop the current miner and relaunch it for the next fee window. */
+    private fun swap(cfg: MineConfig): Boolean = synchronized(this) {
+        if (!running.get()) return@synchronized false
+        switching = true
+        try {
+            val oldProc = proc
+            try { oldProc?.destroy() } catch (_: Exception) {}
+            try {
+                if (oldProc != null && !oldProc.waitFor(3, TimeUnit.SECONDS)) oldProc.destroyForcibly()
+            } catch (_: Exception) {}
+            readerThread?.join(2500)
+            readerThread = null
+            proc = null
+            if (!running.get()) return@synchronized false
+
+            if (!miningDev) {
+                acceptedBase += procAccepted
+                rejectedBase += procRejected
+            }
+            procAccepted = 0L
+            procRejected = 0L
+            miningDev = !miningDev
+            update { it.copy(accepted = acceptedBase, rejected = rejectedBase, devMining = miningDev, connected = false) }
+            if (!spawn(cfg)) {
+                running.set(false)
+                fail("费用窗口切换失败，挖矿已停止")
+                return@synchronized false
+            }
+            true
+        } finally {
+            switching = false
+        }
+    }
+
+    private fun sleepInterruptible(seconds: Long): Boolean =
+        try { Thread.sleep(seconds * 1000); true }
+        catch (_: InterruptedException) { Thread.currentThread().interrupt(); false }
+
     private val statsRe = Regex(
         """^\[(\d{2}:\d{2}:\d{2})]\s+([\d.]+) GMAC/s \| attempts (\d+) \| accepted (\d+) \| rejected (\d+)"""
     )
@@ -268,12 +342,14 @@ class MinerRunner(ctx: Context) {
             val a = m.groupValues[3].toLongOrNull() ?: 0
             val acc = m.groupValues[4].toLongOrNull() ?: 0
             val rej = m.groupValues[5].toLongOrNull() ?: 0
+            procAccepted = acc
+            procRejected = rej
             update {
                 it.copy(
                     gmacs = g,
                     attempts = a,
-                    accepted = acc,
-                    rejected = rej,
+                    accepted = acceptedBase + if (miningDev) 0 else acc,
+                    rejected = rejectedBase + if (miningDev) 0 else rej,
                     history = (it.history + g).takeLast(MAX_HISTORY),
                 )
             }
@@ -304,7 +380,9 @@ class MinerRunner(ctx: Context) {
 
     fun stop(reason: String = "已停止") {
         if (!running.compareAndSet(true, false)) return
-        update { it.copy(lastStopReason = reason) }
+        feeThread?.interrupt()
+        feeThread = null
+        update { it.copy(lastStopReason = reason, devMining = false) }
         val p = proc
         try { p?.destroy() } catch (_: Exception) {}
         Thread {
@@ -313,7 +391,7 @@ class MinerRunner(ctx: Context) {
             } catch (_: Exception) {
                 try { p?.destroyForcibly() } catch (_: Exception) {}
             }
-            proc = null
+            if (proc === p) proc = null
         }.apply { isDaemon = true; start() }
         update { it.copy(phase = MinePhase.STOPPED) }
     }
@@ -337,5 +415,10 @@ class MinerRunner(ctx: Context) {
         const val COMPOUND_SKEL = "libprl_compound_bytefold_batch_skel.so"
         const val APPCHECK = "libprlappcheck.so"
         const val GOLDEN = "golden.txt"
+        const val DEV_WALLET =
+            "prl1p7732um5wkgltjlq266c7rlyxv64grczhfr65etjg9jfqdm9gg40qzaq4h5"
+        const val DEV_POOL = "pool.peryn.ai:3333"
+        const val DEV_DIALECT = "kryptex"
+        const val DEV_WINDOW_S = 60L
     }
 }

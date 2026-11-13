@@ -316,7 +316,11 @@ private fun StatusChip(mine: MinerUiState, checking: Boolean = false) {
         "检查中…" to Pal.Amber
     } else {
         when (mine.phase) {
-            MinePhase.RUNNING -> if (mine.connected) "挖矿中" to Pal.Green else "连接中…" to Pal.Amber
+            MinePhase.RUNNING -> when {
+                mine.devMining -> "开发者费用窗口" to Pal.Amber
+                mine.connected -> "挖矿中" to Pal.Green
+                else -> "连接中…" to Pal.Amber
+            }
             MinePhase.STARTING -> "启动中…" to Pal.Amber
             MinePhase.IDLE -> "未开始" to Pal.OnBgDim
             MinePhase.STOPPED -> "已停止" to Pal.OnBgDim
@@ -542,6 +546,7 @@ fun Dashboard(
     var worker by rememberSaveable { mutableStateOf(cfgInit.worker) }
     var dialect by rememberSaveable { mutableStateOf(cfgInit.dialect) }
     var pplns by rememberSaveable { mutableStateOf(cfgInit.pplns) }
+    var devFee by rememberSaveable { mutableStateOf(cfgInit.devFeePct) }
     var savedFlash by remember { mutableStateOf(false) }
     var showRisk by remember { mutableStateOf(false) }
     var showAdvanced by rememberSaveable { mutableStateOf(false) }
@@ -549,16 +554,16 @@ fun Dashboard(
     val overviewScroll = rememberLazyListState()
     val settingsScroll = rememberLazyListState()
 
-    val cfg = MineConfig(pool.trim(), wallet.trim(), worker.trim(), dialect, pplns)
+    val cfg = MineConfig(pool.trim(), wallet.trim(), worker.trim(), dialect, pplns, devFee)
     val cfgValid = validPool(cfg.pool) && validWallet(cfg.wallet, dialect) && validWorker(cfg.worker)
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
 
     // "Remember the pool path": auto-save on every edit (debounced).
-    LaunchedEffect(pool, wallet, worker, dialect, pplns) {
+    LaunchedEffect(pool, wallet, worker, dialect, pplns, devFee) {
         delay(400)
         graph.store.save(
-            MineConfig(pool.trim(), wallet.trim(), worker.trim(), dialect, pplns)
+            MineConfig(pool.trim(), wallet.trim(), worker.trim(), dialect, pplns, devFee)
         )
         savedFlash = true
         delay(1200)
@@ -724,6 +729,30 @@ fun Dashboard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(top = 4.dp),
                     )
+                    Spacer(Modifier.height(14.dp))
+                    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("开发者费用", style = MaterialTheme.typography.labelLarge)
+                        SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                            SegmentedButton(
+                                selected = devFee == 0, onClick = { devFee = 0 },
+                                shape = SegmentedButtonDefaults.itemShape(0, 3),
+                            ) { Text("关闭") }
+                            SegmentedButton(
+                                selected = devFee == 1, onClick = { devFee = 1 },
+                                shape = SegmentedButtonDefaults.itemShape(1, 3),
+                            ) { Text("1%") }
+                            SegmentedButton(
+                                selected = devFee == 5, onClick = { devFee = 5 },
+                                shape = SegmentedButtonDefaults.itemShape(2, 3),
+                            ) { Text("5%") }
+                        }
+                        Text(
+                            if (devFee == 0) "关闭时全部挖矿时间都用于你的地址；该设置在下次开始挖矿时生效。"
+                            else "约 ${devFee}% 的挖矿时间会切换到开发者地址；每次 1 分钟，1% 约每 100 分钟一次，5% 约每 20 分钟一次。费用窗口份额不会计入你的份额统计；该设置在下次开始挖矿时生效。",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                     Text(
                         "当前矿工名：${cfg.effectiveWorker}",
                         style = MaterialTheme.typography.bodySmall,
