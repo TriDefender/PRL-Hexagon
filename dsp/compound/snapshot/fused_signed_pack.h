@@ -1,4 +1,20 @@
-/* Destination: X[slice16][kt4][row64][k32], uint8 A+128, 2048-byte aligned. */
+/* Fuse signed RM input conversion with DSP activation staging.
+ *
+ * Source: A[slice16][m][128], signed int8, 128-byte aligned.
+ * Destination: X[slice16][kt4][row64][k32], uint8 A+128, 2048-byte aligned.
+ * Only row block rb (64 rows) is copied. Destination span is 131072 bytes.
+ * The source is never modified. This is a staging helper, not a DMA function.
+ *
+ * Four source rows form a 4x4 matrix of 32-byte elements. Two perfect
+ * 32-byte shuffles interleave row pairs; two 64-byte shuffles complete the
+ * transpose. Each resulting 128-byte vector contains one kt from four rows.
+ * V79 HVX PRM p300 byte-level shuffle semantics establish the mapping.
+ * All byte arithmetic is XOR 0x80, exactly representing signed A + 128.
+ *
+ * Preconditions: m >= 64 and divisible by 64; 0 <= rb < m/64; aligned source
+ * and destination spans are valid. The public kernel validates these before
+ * entering the hot path. Compile with -mhvx -mhvx-length=128B.
+ */
 #ifndef PRL_FUSED_SIGNED_PACK_H
 #define PRL_FUSED_SIGNED_PACK_H
 

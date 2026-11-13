@@ -35,7 +35,7 @@ with tempfile.TemporaryDirectory(prefix='prl-deep4-failfast-') as name:
     subprocess.run([qaic, str(root / 'dsp/fused/fused.idl'), '-o', str(gen_fused)], check=True)
     cmd = [os.environ.get('CC', 'cc'), '-O2', '-std=gnu11', '-pthread',
            '-DWITH_QNPU', '-DPRL_BATCH_ATTEMPTS=32', '-DBLAKE3_USE_NEON=1',
-           '-Dprl_compound_batch_run=prl_compound_deep4_batch_run',
+           '-Dprl_compound_batch_run=prl_compound_bytefold_batch_run',
            '-DBLAKE3_NO_SSE2', '-DBLAKE3_NO_SSE41', '-DBLAKE3_NO_AVX2', '-DBLAKE3_NO_AVX512',
            '-fsanitize=address,undefined', '-fno-omit-frame-pointer',
            '-ffunction-sections', '-fdata-sections', '-Wl,--gc-sections',
@@ -48,6 +48,6 @@ with tempfile.TemporaryDirectory(prefix='prl-deep4-failfast-') as name:
            str(miner / 'blake3/blake3_portable.c'), '-lm', '-ldl', '-o', str(tmp / 'check')]
     subprocess.run(cmd, check=True)
     env = os.environ.copy()
-    env['PRL_EXPECT_DEEP4_MODE'] = '0'
+    env['PRL_EXPECT_BYTEFOLD_EARLY'] = '0'
     env['PRL_PERSIST_MAP'] = '0'
     subprocess.run([str(tmp / 'check')], check=True, timeout=240, env=env)

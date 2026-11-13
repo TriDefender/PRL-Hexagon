@@ -1,0 +1,32 @@
+{
+  "utc": "2026-11-13T10:00:30.619500+00:00",
+  "snapshot": {
+    "boot_id": "372c645a-bf83-409d-b8cf-c586aec65ff3",
+    "owned_processes": 0,
+    "lock": false,
+    "charging": false,
+    "npu_sensors_millic": [
+      31200,
+      30800,
+      30500,
+      30500,
+      30800,
+      30800,
+      30800
+    ],
+    "npu_max_millic": 31200,
+    "socd_sensors_percent": [
+      68
+    ],
+    "socd_max_percent": 68,
+    "formal_sha256": "f44372d6ac9f5a33e5c3980e84c75d2f54b67831d8cf57d6a04c0b758da3200d",
+    "private_sha256": "67e5fc135befe7f4158575df9fe439bd6d59a9446219fc5b69c399ee12d378e4",
+    "root_sha256": "67e5fc135befe7f4158575df9fe439bd6d59a9446219fc5b69c399ee12d378e4"
+  },
+  "formal_unchanged": true,
+  "PF0_and_legacy_deep0_unchanged": true,
+  "temporary_pool_config_absent": true,
+  "all_owned_wakelocks_released": true,
+  "new_root_basename_absent": true,
+  "owned_processes": 0
+}

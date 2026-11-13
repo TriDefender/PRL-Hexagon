@@ -1,4 +1,6 @@
-/* Offline-only device check of the actual miner adapter's compact pipeline. */
+/* Offline-only device check of the actual miner adapter's compact pipeline.
+ * Uses real FastRPC and independent CPU commitments/tile calculations.
+ * It creates synthetic jobs and never opens a network connection. */
 #include <inttypes.h>
 #include <stdint.h>
 #include <stdio.h>

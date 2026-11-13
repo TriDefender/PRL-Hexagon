@@ -1,4 +1,16 @@
-/* SDK qurt_memory.h documents SYNCHT as completing all previous memory transactions from the issuing thread and making them globally observable. */
+/* SPSC transport for VTCM HMX exports and a dedicated HVX consumer.
+ *
+ * Ownership: producer owns HMX and each free raw slot, consumer owns g_cum and
+ * output. Metadata/sequence counters live in coherent ordinary DSP memory;
+ * 8 KiB raw slot payloads live in VTCM. A slot is not reused until the consumer
+ * has completed its HVX reads. The producer completes HMX writes before publish.
+ *
+ * SDK qurt_memory.h documents SYNCHT as completing all previous memory
+ * transactions from the issuing thread and making them globally observable.
+ * Both ownership transfers use this conservative completion plus C atomics.
+ * This is deliberately stronger than a compiler barrier. HMX-specific cross-
+ * thread visibility still needs repeated full device comparisons against CPU.
+ */
 #ifndef PRL_FUSED_PIPELINE_H
 #define PRL_FUSED_PIPELINE_H
 
@@ -50,7 +62,8 @@ static int prl_pipe_wait(prl_pipe *p,uint32_t *word,uint32_t expected) {
     while (__atomic_load_n(word,__ATOMIC_ACQUIRE)!=expected) {
         if (prl_pipe_stopped(p)) return AEE_EFAILED;
         if ((++spins&4095u)==0) {
-            /* Avoid an unbounded join if the peer could not run. */
+            /* Avoid an unbounded join if the peer could not run. This deadline
+             * is per ownership transfer, far longer than a normal tile. */
             if (HAP_perf_get_time_us()-start>2000000u) {
                 int empty=0;
                 __atomic_compare_exchange_n(&p->status,&empty,AEE_EEXPIRED,0,
@@ -65,7 +78,9 @@ static int prl_pipe_wait(prl_pipe *p,uint32_t *word,uint32_t expected) {
 }
 static void prl_pipe_worker(void *arg) {
     prl_pipe *p=(prl_pipe *)arg;
-    /* The immediate-use try_lock can fail when physical units are transiently busy even though normal context switching can execute this worker. */
+    /* V65+ maps normal lock to a context-switchable HVX set request. The
+     * immediate-use try_lock can fail when physical units are transiently busy
+     * even though normal context switching can execute this worker. */
     int rc=qurt_hvx_lock(QURT_HVX_MODE_128B);
     __atomic_store_n(&p->lock_rc,rc,__ATOMIC_RELEASE);
     if (rc) {
@@ -116,7 +131,8 @@ static int prl_pipe_start(prl_pipe *p,uint8_t *vtcm,uint32_t raw_offset,
     void *stack=(void *)(((uintptr_t)p->stack_raw+127u)&~(uintptr_t)127u);
     qurt_thread_attr_t attr;
     qurt_thread_attr_init(&attr);
-    /* The QuRT default is LEGACY, which discards an exited thread before a later join. */
+    /* The QuRT default is LEGACY, which discards an exited thread before a
+     * later join. Explicit JOINABLE preserves termination until it is reaped. */
     qurt_thread_attr_set_detachstate(&attr,QURT_THREAD_ATTR_CREATE_JOINABLE);
     qurt_thread_attr_set_name(&attr,"prl_hvx_fold");
     qurt_thread_attr_set_stack_addr(&attr,stack);
@@ -154,7 +170,9 @@ static int prl_pipe_finish(prl_pipe *p,int abort) {
     int status=0;
     int rc=qurt_thread_join(p->tid,&status);
     p->join_rc=rc;p->join_status=status;
-    /* On join failure, never time out and let an external RPC writer outlive the mapping: all callback accesses plus SYNCHT must complete first. */
+    /* Successful join already follows quiet, avoiding an extra timer wait.
+     * On join failure, never time out and let an external RPC writer outlive
+     * the mapping: all callback accesses plus SYNCHT must complete first. */
     while (!__atomic_load_n(&p->quiet,__ATOMIC_ACQUIRE)) qurt_sleep(1);
     if (rc) return AEE_EFAILED;
     p->created=0;free(p->stack_raw);p->stack_raw=NULL;

@@ -1,4 +1,11 @@
-/* The producer must pass short_export only when every corrected int32 value in this 64x32 snapshot fits signed24 (the cached weight-prefix proof). */
+/* One compact consumer body for exact mixed three/four-plane snapshots.
+ *
+ * The producer must pass short_export only when every corrected int32 value
+ * in this 64x32 snapshot fits signed24 (the cached weight-prefix proof).
+ * Low planes and final unpack/column fold are shared by both widths. The
+ * fourth plane is never read in short mode; sign extension commutes with XOR.
+ * Input order, band/slice scratch layout and left/right XOR are unchanged.
+ */
 #ifndef PRL_FUSED_ADAPTIVE_SHARED_H
 #define PRL_FUSED_ADAPTIVE_SHARED_H
 #include "fused_fold_compact.h"

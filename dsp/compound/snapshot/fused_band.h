@@ -1,4 +1,14 @@
-/* Counts, processed and produced are BANDS here, not 64x32 snapshot tiles. */
+/* Band-batched SPSC transport, derived from the verified multi transport.
+ * Each worker owns one 256 KiB VTCM buffer containing [half2][slice16][8KiB].
+ * Producer acquires it once, computes all 32 retained snapshots, completes
+ * HMX stores with SYNCHT and publishes once. Consumer processes the entire
+ * band, completes its reads/stores and releases once. No slot is reused
+ * while its previous band is in flight. FIFO ownership is band % workers.
+ *
+ * Counts, processed and produced are BANDS here, not 64x32 snapshot tiles.
+ * The callback receives (context, row_block, band, unused, raw_band_base).
+ * Cache layout can reuse PRL_MULTI_RAW_BYTES(workers): the byte count is equal.
+ */
 #ifndef PRL_FUSED_BAND_H
 #define PRL_FUSED_BAND_H
 #include <stdint.h>
@@ -84,7 +94,8 @@ static int prl_band_wait(prl_band_worker *w,uint32_t *word,uint32_t expected) {
 }
 static void prl_band_worker_main(void *arg) {
     prl_band_worker *w=(prl_band_worker *)arg;
-    /* JOINABLE below preserves the exited worker until its parent collects the status. */
+    /* Request a virtualized 128-byte HVX context. JOINABLE below preserves
+     * the exited worker until its parent collects the status. */
     const int lock=qurt_hvx_lock(QURT_HVX_MODE_128B);
     __atomic_store_n(&w->lock_rc,lock,__ATOMIC_RELEASE);
     if (lock) {
@@ -133,10 +144,13 @@ static int prl_band_finish(prl_band *p,int abort) {
         int status=0;
         const int rc=qurt_thread_join(w->tid,&status);
         w->join_rc=rc;w->join_status=status;
-        /* A failed join does not retain the caller's RPC mapping, so wait for every callback access plus SYNCHT without an unsafe timeout. */
+        /* Join normally follows quiet with no additional timer wakeup. A
+         * failed join does not retain the caller's RPC mapping, so wait for
+         * every callback access plus SYNCHT without an unsafe timeout. */
         while (!__atomic_load_n(&w->quiet,__ATOMIC_ACQUIRE)) qurt_sleep(1);
         if (rc) {
-            /* The caller must not reuse VTCM after such a failure. */
+            /* A failed join does not prove termination; keep the worker stack
+             * allocated. The caller must not reuse VTCM after such a failure. */
             if (!first_error) first_error=AEE_EFAILED;
             continue;
         }

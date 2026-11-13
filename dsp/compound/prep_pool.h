@@ -53,7 +53,8 @@ static void *prl_prep_worker_main(void *argument) {
     uint64_t seen=0;
     while (!pin_rc) {
         while (!p->stop&&seen==p->epoch) pthread_cond_wait(&p->changed,&p->mutex);
-        /* Even a concurrent stop must finish an already published job. */
+        /* Even a concurrent stop must finish an already published job. Its
+         * stack context and output remain owned until pending reaches zero. */
         if (seen!=p->epoch) {
             seen=p->epoch;
             prl_prep_task_fn task=p->task;void *job=p->argument;
@@ -65,12 +66,14 @@ static void *prl_prep_worker_main(void *argument) {
         } else if (p->stop) break;
     }
     pthread_mutex_unlock(&p->mutex);
-    /* Failed joins may wait for this before returning; no task input/output is touched after this store. */
+    /* Last access to pool/worker metadata. Failed joins may wait for this
+     * before returning; no task input/output is touched after this store. */
     __atomic_store_n(&w->quiet,1,__ATOMIC_RELEASE);
     return NULL;
 }
 
-/* The caller must finish a partially started pool before releasing input or metadata. */
+/* A partially started pool is returned through out on create/pin failure.
+ * The caller must finish it before releasing input or metadata. */
 static int prl_prep_pool_start(prl_prep_pool **out,unsigned workers,
                                const int cpus[PRL_PREP_MAX_WORKERS],prl_prep_pin_fn pin) {
     if (!out||*out||!cpus||!pin||
@@ -100,7 +103,8 @@ static int prl_prep_pool_start(prl_prep_pool **out,unsigned workers,
     return rc;
 }
 
-/* task/argument are immutable until this returns, including on errors. */
+/* A single coordinator submits one batch at a time. task/argument are immutable
+ * until this returns, including on errors. Each attempt has exactly one owner. */
 static int prl_prep_pool_run(prl_prep_pool *p,prl_prep_task_fn task,void *argument) {
     if (!p||!task) return EINVAL;
     pthread_mutex_lock(&p->mutex);
@@ -119,7 +123,9 @@ static int prl_prep_pool_run(prl_prep_pool *p,prl_prep_task_fn task,void *argume
     return result;
 }
 
-/* Join failure retains the entire heap pool and primitives after all workers become externally quiet. */
+/* Normal caller first stops/joins its preprocessor, then calls finish, and only
+ * then frees input slots. No thread cancellation is used. Join failure retains
+ * the entire heap pool and primitives after all workers become externally quiet. */
 static int prl_prep_pool_finish(prl_prep_pool **handle) {
     if (!handle) return EINVAL;
     prl_prep_pool *p=*handle;if (!p) return 0;

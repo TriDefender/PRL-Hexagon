@@ -1,4 +1,6 @@
-/* The first attempt uses compact A' and the prepared B' to calculate all 1024 tiles on CPU. */
+/* Host-only model for running app_check itself. The first attempt uses compact
+ * A' and the prepared B' to calculate all 1024 tiles on CPU. Subsequent mixed
+ * masks are stubbed; all-hit masks are exact by construction. No DSP runs. */
 #include <assert.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -73,6 +75,8 @@ int prl_compound_batch_run(int attempts,int n,int flags,int mode,const byte *x,i
     d[CB_PRE_Q6_HZ]=d[CB_PRE_HMX_HZ]=d[CB_POST_Q6_HZ]=d[CB_POST_HMX_HZ]=1000000000u;
     d[CB_OUTPUT_WORDS]=1024;d[CB_WORDS_PER_ATTEMPT]=32;d[CB_MAX_CHUNK]=32;
     d[CB_CORE_TICKS]=100;d[CB_OUTER_TICKS]=110;d[CB_OUTER_PCYCLES]=12345;
-    d[CB_SUM_CORE_PCYCLES]=10000;d[63]=UINT32_C(0x44454500);
+    const char *tag_mode=getenv("PRL_EXPECT_BYTEFOLD_EARLY");
+    assert(tag_mode&&(tag_mode[0]=='0'||tag_mode[0]=='1')&&tag_mode[1]=='\0');
+    d[CB_SUM_CORE_PCYCLES]=10000;d[63]=UINT32_C(0x42464500)|(uint32_t)(tag_mode[0]-'0');
     *cycles=12345;return 0;
 }

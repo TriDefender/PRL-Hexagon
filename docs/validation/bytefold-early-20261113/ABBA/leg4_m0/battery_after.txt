@@ -1,0 +1,38 @@
+Current OPLUS Battery Service state:
+  Charger voltage : 35
+  Battery current : 1452
+  ChargerTechnology: 0
+  ChargeFastCharger: false
+  PlugType: 0
+  UpdatesStopped: false
+  UsbHwStatus: 0
+  BatteryHwStatus: 0
+  HwStatusIsSet: 1
+  BatteryIcStatus: 0
+  IcStatusIsSet: 1
+
+  mUsbStatus: 0
+  PhoneTemp: 380
+  ThermalFeatureOn: true
+Current Battery Service state:
+  AC powered: false
+  USB powered: false
+  Wireless powered: false
+  Dock powered: false
+  Max charging current: 0
+ Time when the latest updated value of the Max charging current was sent via battery changed broadcast: +14h56m10s187ms
+  Max charging voltage: 0
+  Charge counter: 2614000
+  status: 3
+  health: 2
+  present: true
+  level: 45
+  scale: 100
+  voltage: 3704
+ Time when the latest updated value of the voltage was sent via battery changed broadcast: +15h22m4s788ms
+ The last voltage value sent via the battery changed broadcast: 3710
+  temperature: 322
+  technology: Li-ion
+  Charging state: 0
+  Charging policy: 0
+  Capacity level: 3

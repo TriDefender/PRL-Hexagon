@@ -1,7 +1,11 @@
 /*
- * qnpu_fused.c — production miner adapter for the fused Hexagon HMX path:
- * prefix folds and keyed hashes stay in the DSP, returning one 32-bit hit
- * mask per 64x64 band.
+ * qnpu_fused.c — production miner adapter for the fused Hexagon HMX path.
+ *
+ * The old QNN backend returns sixteen full INT32 matrices to ARM and folds
+ * them there. This backend keeps the Pearl prefix folds and keyed hashes in
+ * the DSP, returning only one 32-bit hit mask per 64x64 band. It implements
+ * qnpu.h so the existing Stratum, nonce/job ownership, and PlainProof path can
+ * be reused unchanged.
  */
 #define _GNU_SOURCE
 #include "qnpu.h"
@@ -30,9 +34,9 @@
 #define FUSED_OUTPUT_MODE_MASK 2
 #define FUSED_OUTPUT_MODE_DIGEST 1
 #define COMPOUND_ATTEMPTS PRL_BATCH_ATTEMPTS
-#define DEEP4_RUNTIME_TAG_MAGIC UINT32_C(0x44454500)
-#define DEEP4_RUNTIME_TAG_MAGIC_MASK UINT32_C(0xffffff00)
-#define DEEP4_RUNTIME_TAG_WORD 63u
+#define BYTEFOLD_RUNTIME_TAG_MAGIC UINT32_C(0x42464500)
+#define BYTEFOLD_RUNTIME_TAG_MAGIC_MASK UINT32_C(0xffffff00)
+#define BYTEFOLD_RUNTIME_TAG_WORD 63u
 #if COMPOUND_ATTEMPTS != 32
 #error "compact compound path requires exactly 32 attempts"
 #endif
@@ -108,8 +112,8 @@ struct pr_qnpu_ctx {
     int compound_failed;
     int fused_failed;
     int compound_weights_loaded;
-    int expected_deep4_mode;
-    int deep4_mode_reported;
+    int expected_bytefold_mode;
+    int bytefold_mode_reported;
     pthread_t prep_thread;
     pthread_mutex_t prep_mu;
     pthread_cond_t prep_cv;
@@ -243,7 +247,9 @@ static int prepare_compound_noise(void *argument, unsigned attempt) {
             s->x + PRL_COMPACT_BASE_BYTES + (size_t)attempt * PRL_COMPACT_RECORD_BYTES);
 }
 
-/* Merkle patching is serial because all attempts share the same tree. */
+/* Merkle patching is serial because all attempts share the same tree. Once
+ * commitments/keys are materialized, independent A' packing can use the
+ * pinned ARM prep pool while the DSP executes the preceding RPC. */
 static int prepare_compound_slot(pr_qnpu_ctx *c, compound_slot *s,
                                  uint64_t first_nonce) {
     const double t0 = now_ms();
@@ -410,20 +416,17 @@ static unsigned compound_prep_workers(void) {
     return workers >= 1 && workers <= 4 ? (unsigned)workers : 4u;
 }
 
-static int parse_expected_deep4_mode(int *mode) {
-    const char *setting = getenv("PRL_EXPECT_DEEP4_MODE");
-    if (!setting) {
-        *mode = -1;
-        return 0;
-    }
+static int parse_expected_bytefold_mode(int *mode) {
+    const char *setting = getenv("PRL_EXPECT_BYTEFOLD_EARLY");
+    if (!setting || !mode) return -1;
     if (setting[0] == '0' && setting[1] == '\0') *mode = 0;
     else if (setting[0] == '1' && setting[1] == '\0') *mode = 1;
     else return -1;
     return 0;
 }
 
-static int decode_deep4_runtime_tag(uint32_t tag, unsigned *mode) {
-    if ((tag & DEEP4_RUNTIME_TAG_MAGIC_MASK) != DEEP4_RUNTIME_TAG_MAGIC ||
+static int decode_bytefold_runtime_tag(uint32_t tag, unsigned *mode) {
+    if ((tag & BYTEFOLD_RUNTIME_TAG_MAGIC_MASK) != BYTEFOLD_RUNTIME_TAG_MAGIC ||
         (tag & 0xffu) > 1u) return 0;
     *mode = tag & 0xffu;
     return 1;
@@ -460,30 +463,25 @@ static int compound_summary_valid(pr_qnpu_ctx *c, const compound_slot *s,
                 d[CB_POISON], d[CB_CORE_RC], d[CB_INIT_RC], d[CB_BEGIN_RC], d[CB_END_RC]);
         return 0;
     }
-    const uint32_t runtime_tag = d[DEEP4_RUNTIME_TAG_WORD];
+    const uint32_t runtime_tag = d[BYTEFOLD_RUNTIME_TAG_WORD];
     unsigned runtime_mode = 0;
-    if (!decode_deep4_runtime_tag(runtime_tag, &runtime_mode)) {
-        fprintf(stderr, "[prl-miner] compound DSP runtime tag invalid tag=0x%08x\n",
+    if (!decode_bytefold_runtime_tag(runtime_tag, &runtime_mode)) {
+        fprintf(stderr, "[prl-miner] compound DSP runtime bytefold tag invalid tag=0x%08x\n",
                 runtime_tag);
         return 0;
     }
-    if (c->expected_deep4_mode >= 0 &&
-        runtime_mode != (unsigned)c->expected_deep4_mode) {
+    if (c->expected_bytefold_mode < 0 ||
+        runtime_mode != (unsigned)c->expected_bytefold_mode) {
         fprintf(stderr,
-                "[prl-miner] compound DSP runtime deep4 mode mismatch expected=%d actual=%u tag=0x%08x\n",
-                c->expected_deep4_mode, runtime_mode, runtime_tag);
+                "[prl-miner] compound DSP runtime bytefold mode mismatch expected=%d actual=%u tag=0x%08x\n",
+                c->expected_bytefold_mode, runtime_mode, runtime_tag);
         return 0;
     }
-    if (!c->deep4_mode_reported) {
-        if (c->expected_deep4_mode >= 0)
-            fprintf(stderr,
-                    "[prl-miner] compound runtime_deep4_mode=%u runtime_deep4_tag=0x%08x expected=%d\n",
-                    runtime_mode, runtime_tag, c->expected_deep4_mode);
-        else
-            fprintf(stderr,
-                    "[prl-miner] compound runtime_deep4_mode=%u runtime_deep4_tag=0x%08x expected=unset\n",
-                    runtime_mode, runtime_tag);
-        c->deep4_mode_reported = 1;
+    if (!c->bytefold_mode_reported) {
+        fprintf(stderr,
+                "[prl-miner] compound runtime_deep4_mode=1 runtime_prefetch_order=0 runtime_bytefold_early=%u runtime_bytefold_tag=0x%08x expected=%d\n",
+                runtime_mode, runtime_tag, c->expected_bytefold_mode);
+        c->bytefold_mode_reported = 1;
     }
     return 1;
 }
@@ -579,8 +577,8 @@ int pr_qnpu_compound_pipe(pr_qnpu_ctx *c, uint64_t first_nonce) {
     if (rc) {
         c->compound_failed = 1;
         compound_slot_free(c, cur);
-        /* Wait for and release its speculative ARM input before falling back
-         * to fused RPC. */
+        /* A failed compound namespace may be sticky-poisoned. Wait for and
+         * release its speculative ARM input before falling back to fused RPC. */
         pthread_mutex_lock(&c->prep_mu);
         while (c->prep_busy) pthread_cond_wait(&c->prep_cv, &c->prep_mu);
         pthread_mutex_unlock(&c->prep_mu);
@@ -648,7 +646,7 @@ static void decode_masks_from(pr_qnpu_ctx *c, const uint32_t *mask_words,
             ++r->hits;
         }
         if (!bits) continue;
-        /* The share API caps hits at 1024. */
+        /* The share API caps hits at 1024. Discard any excess mask bits. */
         break;
     }
 }
@@ -817,7 +815,7 @@ int pr_qnpu_device_count(char *reason, size_t cap) {
 
 pr_qnpu_ctx *pr_qnpu_new(uint32_t m, uint32_t n, uint32_t k,
                          char *err, size_t errcap) {
-    int expected_deep4_mode = -1;
+    int expected_bytefold_mode = -1;
     if (errcap) err[0] = 0;
     if (k != 2048 || m < 64 || m > 8192 || m % 64 ||
         n < 64 || n > 2048 || n % 64) {
@@ -825,16 +823,16 @@ pr_qnpu_ctx *pr_qnpu_new(uint32_t m, uint32_t n, uint32_t k,
             "fused backend requires k=2048, m=64..8192 and n=64..2048 (multiples of 64)");
         return NULL;
     }
-    if (parse_expected_deep4_mode(&expected_deep4_mode)) {
+    if (parse_expected_bytefold_mode(&expected_bytefold_mode)) {
         if (err && errcap) snprintf(err, errcap,
-            "PRL_EXPECT_DEEP4_MODE must be exactly 0 or 1 when set");
+            "PRL_EXPECT_BYTEFOLD_EARLY must be exactly 0 or 1");
         return NULL;
     }
     if (init_rpc(err, errcap)) return NULL;
     pr_qnpu_ctx *c = calloc(1, sizeof(*c));
     if (!c) return NULL;
     c->m=m; c->n=n; c->k=k; c->flags=FUSED_FLAGS;
-    c->expected_deep4_mode=expected_deep4_mode;
+    c->expected_bytefold_mode=expected_bytefold_mode;
     c->alen=(size_t)m*k; c->blen=(size_t)n*k; c->xlen=(size_t)m*k;
     c->bands=(size_t)(m/64u)*(n/64u);
     c->digest_words=c->bands*256u;
@@ -928,7 +926,8 @@ int pr_qnpu_set_job(pr_qnpu_ctx *c, const uint8_t header76[76],
 
     pr_attempt_mats base={.m=c->m,.n=c->n,.k=c->k,.a=c->ha,.bt=c->hb};
     pr_fill_base(&base,c->base_seed);
-    /* Each mapped slot owns the immutable base for this job. */
+    /* Each mapped slot owns the immutable base for this job. The worker was
+     * drained above; individual nonce records follow the copied base. */
     if (c->compound_available) {
         for (int i = 0; i < 2; ++i)
             memcpy(c->compound[i].x, c->ha, PRL_COMPACT_BASE_BYTES);

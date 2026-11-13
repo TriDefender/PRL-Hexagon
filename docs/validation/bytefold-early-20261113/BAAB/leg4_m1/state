@@ -1,0 +1,10 @@
+status=complete_bounded
+mode=1
+expected_tag=0x42464501
+prep_workers=4
+start_uptime_cs=8560247
+stop_uptime_cs=8563253
+end_uptime_cs=8563300
+stop_reason=duration_elapsed
+child_exit_code=143
+affinity_complete=1

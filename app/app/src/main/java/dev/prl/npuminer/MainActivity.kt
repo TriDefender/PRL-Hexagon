@@ -767,7 +767,7 @@ fun Dashboard(
                     }
                     if (showAdvanced) {
                         Text(
-                            "deep4 · 流体云通知 · 普通权限运行",
+                            "early byte-fold · 流体云通知 · 普通权限运行",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(top = 10.dp),

@@ -1,4 +1,15 @@
-/* Exact three-byte corrected HMX export when a cached weight-prefix bound proves every accumulator in the 32-column block fits signed 24 bits. */
+/* Exact three-byte corrected HMX export when a cached weight-prefix bound
+ * proves every accumulator in the 32-column block fits signed 24 bits.
+ *
+ * For A in [-128,127], write P=sum(max(W,0)), N=sum(max(-W,0)) over the
+ * complete prefix. Then -128*P-127*N <= C <= 127*P+128*N. Both extrema are
+ * attainable. Signed 24-bit encoding is valid precisely when the lower
+ * bound is >= -2^23 and the upper bound is STRICTLY < 2^23.
+ *
+ * After byte-plane XOR reduction, the missing high byte is the sign
+ * extension of bit23 of that XOR: sign extension is an XOR-linear mapping.
+ * This shortcut must never be applied to uncorrected raw u8*i8 output.
+ */
 #ifndef PRL_FUSED_ADAPTIVE_EXPORT_H
 #define PRL_FUSED_ADAPTIVE_EXPORT_H
 #include <stdint.h>

@@ -1,0 +1,61 @@
+[prl-miner] compound prep pool active: 4 workers
+Warning: rpcmem_init is deprecated. For all the targets supported on Hexagon SDK 6.0, this API doesn't need to be called.
+[01:18:43] prl-c-miner 0.1.0 | shape 2048x1024x2048 | NPU | 1 thread(s) | pool 88.216.36.134:3333
+[connection/account line omitted]
+[01:18:43] pool stats interval 1 s
+[01:18:43] new job 25982c9f_2097152 height=142408 diff=2097152 cert=v3
+[01:18:43] npu job 25982c9f_2097152 ready (shape 2048x1024x2048)
+[01:18:43] compound DSP batching active: 32 attempts per FastRPC call
+[prl-miner] compound runtime_deep4_mode=1 runtime_prefetch_order=0 runtime_bytefold_early=1 runtime_bytefold_tag=0x42464501 expected=1
+[01:18:44] 5222.03 GMAC/s | attempts 1216 | accepted 0 | rejected 0 | sample_elapsed_s=1.000125 delta_macs=5222680231936
+[prl-miner] compound batch32 prep 14.70 ms, RPC 17.75 ms, core 0.03 Gcycles, HMX 806->979 MHz, Q6 2112->1939 MHz
+[01:18:45] 7420.64 GMAC/s | attempts 2944 | accepted 0 | rejected 0 | sample_elapsed_s=1.000143 delta_macs=7421703487488
+[prl-miner] compound batch32 prep 8.82 ms, RPC 18.51 ms, core 0.03 Gcycles, HMX 672->979 MHz, Q6 2112->2112 MHz
+[01:18:46] 7421.13 GMAC/s | attempts 4672 | accepted 0 | rejected 0 | sample_elapsed_s=1.000078 delta_macs=7421703487488
+[prl-miner] compound batch32 prep 8.33 ms, RPC 18.82 ms, core 0.03 Gcycles, HMX 806->806 MHz, Q6 2112->1708 MHz
+[01:18:47] 7145.87 GMAC/s | attempts 6336 | accepted 0 | rejected 0 | sample_elapsed_s=1.000134 delta_macs=7146825580544
+[01:18:48] 7146.15 GMAC/s | attempts 8000 | accepted 0 | rejected 0 | sample_elapsed_s=1.000095 delta_macs=7146825580544
+[prl-miner] compound batch32 prep 7.97 ms, RPC 20.86 ms, core 0.04 Gcycles, HMX 1075->979 MHz, Q6 1939->1382 MHz
+[01:18:49] 7146.33 GMAC/s | attempts 9664 | accepted 0 | rejected 0 | sample_elapsed_s=1.000069 delta_macs=7146825580544
+[prl-miner] compound batch32 prep 8.85 ms, RPC 19.06 ms, core 0.03 Gcycles, HMX 806->806 MHz, Q6 2112->1708 MHz
+[01:18:50] 7142.68 GMAC/s | attempts 11328 | accepted 0 | rejected 0 | sample_elapsed_s=1.000581 delta_macs=7146825580544
+[prl-miner] compound batch32 prep 8.90 ms, RPC 19.36 ms, core 0.03 Gcycles, HMX 672->979 MHz, Q6 2112->1593 MHz
+[01:18:51] 7146.16 GMAC/s | attempts 12992 | accepted 0 | rejected 0 | sample_elapsed_s=1.000093 delta_macs=7146825580544
+[prl-miner] compound batch32 prep 7.72 ms, RPC 19.20 ms, core 0.03 Gcycles, HMX 806->806 MHz, Q6 2112->1708 MHz
+[01:18:52] 7008.86 GMAC/s | attempts 14624 | accepted 0 | rejected 0 | sample_elapsed_s=1.000075 delta_macs=7009386627072
+[01:18:53] 7146.30 GMAC/s | attempts 16288 | accepted 0 | rejected 0 | sample_elapsed_s=1.000073 delta_macs=7146825580544
+[prl-miner] compound batch32 prep 7.53 ms, RPC 19.20 ms, core 0.03 Gcycles, HMX 806->979 MHz, Q6 2112->1708 MHz
+[01:18:54] 7146.30 GMAC/s | attempts 17952 | accepted 0 | rejected 0 | sample_elapsed_s=1.000073 delta_macs=7146825580544
+[prl-miner] compound batch32 prep 10.21 ms, RPC 19.33 ms, core 0.03 Gcycles, HMX 806->806 MHz, Q6 2112->1593 MHz
+[01:18:55] 7140.30 GMAC/s | attempts 19616 | accepted 0 | rejected 0 | sample_elapsed_s=1.000914 delta_macs=7146825580544
+[prl-miner] compound batch32 prep 17.89 ms, RPC 18.66 ms, core 0.03 Gcycles, HMX 979->806 MHz, Q6 1939->1939 MHz
+[01:18:56] 7144.86 GMAC/s | attempts 21280 | accepted 0 | rejected 0 | sample_elapsed_s=1.000275 delta_macs=7146825580544
+[prl-miner] compound batch32 prep 7.53 ms, RPC 20.45 ms, core 0.03 Gcycles, HMX 1209->979 MHz, Q6 2112->1939 MHz
+[01:18:57] 7008.80 GMAC/s | attempts 22912 | accepted 0 | rejected 0 | sample_elapsed_s=1.000083 delta_macs=7009386627072
+[01:18:58] 6871.28 GMAC/s | attempts 24512 | accepted 0 | rejected 0 | sample_elapsed_s=1.000097 delta_macs=6871947673600
+[prl-miner] compound batch32 prep 17.51 ms, RPC 25.18 ms, core 0.03 Gcycles, HMX 806->806 MHz, Q6 2112->1708 MHz
+[01:18:59] 7008.85 GMAC/s | attempts 26144 | accepted 0 | rejected 0 | sample_elapsed_s=1.000077 delta_macs=7009386627072
+[prl-miner] compound batch32 prep 14.30 ms, RPC 21.74 ms, core 0.03 Gcycles, HMX 806->672 MHz, Q6 2112->1382 MHz
+[01:19:00] 7008.86 GMAC/s | attempts 27776 | accepted 0 | rejected 0 | sample_elapsed_s=1.000075 delta_macs=7009386627072
+[prl-miner] compound batch32 prep 17.98 ms, RPC 19.60 ms, core 0.03 Gcycles, HMX 1209->806 MHz, Q6 2112->1939 MHz
+[01:19:01] 7008.86 GMAC/s | attempts 29408 | accepted 0 | rejected 0 | sample_elapsed_s=1.000075 delta_macs=7009386627072
+[prl-miner] compound batch32 prep 7.51 ms, RPC 19.04 ms, core 0.03 Gcycles, HMX 1075->672 MHz, Q6 1939->1593 MHz
+[01:19:02] 7008.51 GMAC/s | attempts 31040 | accepted 0 | rejected 0 | sample_elapsed_s=1.000126 delta_macs=7009386627072
+[01:19:03] 7008.86 GMAC/s | attempts 32672 | accepted 0 | rejected 0 | sample_elapsed_s=1.000075 delta_macs=7009386627072
+[prl-miner] compound batch32 prep 7.53 ms, RPC 19.09 ms, core 0.03 Gcycles, HMX 672->979 MHz, Q6 2112->1939 MHz
+[01:19:04] 7144.67 GMAC/s | attempts 34336 | accepted 0 | rejected 0 | sample_elapsed_s=1.000302 delta_macs=7146825580544
+[prl-miner] compound batch32 prep 9.78 ms, RPC 18.87 ms, core 0.03 Gcycles, HMX 979->806 MHz, Q6 2112->1708 MHz
+[01:19:05] 7008.21 GMAC/s | attempts 35968 | accepted 0 | rejected 0 | sample_elapsed_s=1.000169 delta_macs=7009386627072
+[prl-miner] compound batch32 prep 10.43 ms, RPC 19.08 ms, core 0.03 Gcycles, HMX 806->806 MHz, Q6 2112->1382 MHz
+[01:19:06] 6871.01 GMAC/s | attempts 37568 | accepted 0 | rejected 0 | sample_elapsed_s=1.000136 delta_macs=6871947673600
+[prl-miner] compound batch32 prep 13.42 ms, RPC 18.63 ms, core 0.03 Gcycles, HMX 1075->672 MHz, Q6 2112->1939 MHz
+[01:19:07] 7008.89 GMAC/s | attempts 39200 | accepted 0 | rejected 0 | sample_elapsed_s=1.000072 delta_macs=7009386627072
+[01:19:08] 7146.30 GMAC/s | attempts 40864 | accepted 0 | rejected 0 | sample_elapsed_s=1.000074 delta_macs=7146825580544
+[prl-miner] compound batch32 prep 7.49 ms, RPC 23.57 ms, core 0.03 Gcycles, HMX 1209->806 MHz, Q6 2112->1593 MHz
+[01:19:09] 6734.05 GMAC/s | attempts 42432 | accepted 0 | rejected 0 | sample_elapsed_s=1.000068 delta_macs=6734508720128
+[prl-miner] compound batch32 prep 8.46 ms, RPC 19.18 ms, core 0.03 Gcycles, HMX 806->979 MHz, Q6 2112->1708 MHz
+[01:19:10] 7008.86 GMAC/s | attempts 44064 | accepted 0 | rejected 0 | sample_elapsed_s=1.000075 delta_macs=7009386627072
+[prl-miner] compound batch32 prep 12.84 ms, RPC 18.63 ms, core 0.03 Gcycles, HMX 1209->979 MHz, Q6 2112->2112 MHz
+[01:19:11] 6871.40 GMAC/s | attempts 45664 | accepted 0 | rejected 0 | sample_elapsed_s=1.000080 delta_macs=6871947673600
+[prl-miner] compound batch32 prep 12.93 ms, RPC 18.92 ms, core 0.03 Gcycles, HMX 1075->979 MHz, Q6 2112->1382 MHz
+[01:19:12] 7008.85 GMAC/s | attempts 47296 | accepted 0 | rejected 0 | sample_elapsed_s=1.000077 delta_macs=7009386627072

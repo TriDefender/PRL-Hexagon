@@ -1,0 +1,38 @@
+{
+  "method": "independent raw vertical-bar field split and Decimal arithmetic; no frozen parser import",
+  "all_rates_and_windows_match": true,
+  "legs": [
+    {
+      "leg": 1,
+      "mode": 1,
+      "windows": 20,
+      "gmac_s": 7077.527869781039,
+      "MAC_attempt_deltas_consistent": true,
+      "max_display_rounding_gmac_s": "0.006193267127150267771081"
+    },
+    {
+      "leg": 2,
+      "mode": 0,
+      "windows": 20,
+      "gmac_s": 6231.1267791613045,
+      "MAC_attempt_deltas_consistent": true,
+      "max_display_rounding_gmac_s": "0.006326838974153876918462"
+    },
+    {
+      "leg": 3,
+      "mode": 0,
+      "windows": 20,
+      "gmac_s": 6287.182969702378,
+      "MAC_attempt_deltas_consistent": true,
+      "max_display_rounding_gmac_s": "0.007184094933652231906722"
+    },
+    {
+      "leg": 4,
+      "mode": 1,
+      "windows": 20,
+      "gmac_s": 6754.487277274189,
+      "MAC_attempt_deltas_consistent": true,
+      "max_display_rounding_gmac_s": "0.006323021374841141044754"
+    }
+  ]
+}

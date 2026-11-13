@@ -1,4 +1,9 @@
-/* Scalar seq words live outside VTCM; SYNCHT precedes both ownership changes. */
+/* Software input staging for the unprofiled fused pipeline. One HVX worker
+ * fills two 128 KiB VTCM input buffers while the producer uses the other.
+ * A buffer is not recycled until the HMX owner has completed its last read.
+ * Scalar seq words live outside VTCM; SYNCHT precedes both ownership changes.
+ * No DMA API, cache-maintenance bypass, or shared-ARM-write RPC input is used.
+ */
 #ifndef PRL_FUSED_STAGE_H
 #define PRL_FUSED_STAGE_H
 #include "fused_multi.h"
@@ -60,7 +65,8 @@ static void prl_stage_main(void *arg) {
         __atomic_store_n(p->seq+(rb&1u),rb+1u,__ATOMIC_RELEASE);
         __atomic_store_n(&w->processed,rb+1u,__ATOMIC_RELEASE);
     }
-    /* No further RPC input access is allowed after source_done. */
+    /* No further RPC input access is allowed after source_done. The final
+     * completion also drains a partial block on an abort path. */
     prl_multi_complete();
     __atomic_store_n(&p->source_done,1,__ATOMIC_RELEASE);
     const int unlock=qurt_hvx_unlock();
@@ -121,7 +127,9 @@ static int prl_stage_finish(prl_stage *p,int abort) {
     prl_multi_worker *w=&p->sync;
     if (!w->created) return __atomic_load_n(&w->status,__ATOMIC_ACQUIRE);
     if (abort) __atomic_store_n(&w->stop,1,__ATOMIC_RELEASE);
-    /* Join failure alone cannot extend the caller's input mapping lifetime. */
+    /* Join failure alone cannot extend the caller's input mapping lifetime.
+     * First prove that the worker has stopped all source accesses. Like join,
+     * this cannot safely time out and let an active reader outlive the RPC. */
     while (!__atomic_load_n(&p->source_done,__ATOMIC_ACQUIRE)) qurt_sleep(1);
     int status=0;
     const int rc=qurt_thread_join(w->tid,&status);

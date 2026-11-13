@@ -1,4 +1,9 @@
-/* This protocol model does NOT prove pending HMX exports survive later MMs. */
+/* Optional production transport: exact retained-prefix groups, fixed 256 KiB/worker.
+ * All snapshots in a group must be fully exported before publish. Producer
+ * SYNCHT+release publishes the whole group; the consumer invokes the unchanged
+ * callback in increasing s order, then SYNCHT+release returns the whole slot.
+ * This protocol model does NOT prove pending HMX exports survive later MMs.
+ */
 #ifndef PRL_FUSED_GROUPED_H
 #define PRL_FUSED_GROUPED_H
 #include "fused_multi.h"
@@ -35,7 +40,8 @@ static inline int prl_grouped_enabled(int flags,int known_queue) {
 #define PRL_GROUPED_SLOT_BYTES (8192u*PRL_SNAPSHOT_GROUP)
 static void prl_grouped_worker_main(void *arg) {
     prl_multi_worker *w=(prl_multi_worker *)arg;
-    /* The historical intermittent exit failure was caused by LEGACY joins, not a proven lock failure. */
+    /* Request a virtualized 128-byte HVX context. The historical intermittent
+     * exit failure was caused by LEGACY joins, not a proven lock failure. */
     const int lock=qurt_hvx_lock(QURT_HVX_MODE_128B);
     __atomic_store_n(&w->lock_rc,lock,__ATOMIC_RELEASE);
     if (lock) {
@@ -63,7 +69,9 @@ static void prl_grouped_worker_main(void *arg) {
         __atomic_store_n(&slot->seq,i+PRL_GROUPED_SLOTS,__ATOMIC_RELEASE);
         __atomic_store_n(&w->processed,i+1u,__ATOMIC_RELEASE);
     }
-    /* Prove that all callback accesses to the caller's RPC output/context are complete before finish is allowed to return; retaining metadata alone cannot retain RPC memory. */
+    /* A failed join may leave this thread alive. Prove that all callback
+     * accesses to the caller's RPC output/context are complete before finish
+     * is allowed to return; retaining metadata alone cannot retain RPC memory. */
     prl_multi_complete();
     __atomic_store_n(&w->quiet,1,__ATOMIC_RELEASE);
     const int unlock=qurt_hvx_unlock();

@@ -1,4 +1,16 @@
-/* The documented QuRT DMSYNCHT operation completes posted DMA memory ops before the producer lets HMX read the VTCM destination. */
+/* Double-buffered activation staging with the SDK user-DMA utility API.
+ *
+ * One DMA transfer is outstanding at a time. A 131072-byte block contains all
+ * 16 slices for 64 rows. The producer waits before consuming the destination,
+ * then submits the next block into the opposite buffer before issuing HMX MM.
+ * Descriptors and both VTCM destinations remain alive until prl_dma_drain.
+ *
+ * Source is ordinary cacheable FastRPC input with normal cache maintenance;
+ * src_bypass remains OFF. Destination is uncached VTCM. The SDK's dmstart
+ * publishes the descriptor with release(...):at. dmwait reports engine status,
+ * and the documented QuRT DMSYNCHT operation completes posted DMA memory ops
+ * before the producer lets HMX read the VTCM destination.
+ */
 #ifndef PRL_FUSED_DMA_H
 #define PRL_FUSED_DMA_H
 #include <stdint.h>
@@ -27,7 +39,8 @@ static int prl_dma_init(prl_dma *p,uint8_t *descriptors) {
     p->probe_rc=0;
     if ((uintptr_t)descriptors&127u) return AEE_EBADPARM;
     if (!p->api_present) return AEE_EUNSUPPORTED;
-    /* Do not take over an already running/error DMA chain from the caller's thread. */
+    /* Check support before posting any work. Do not take over an already
+     * running/error DMA chain from the caller's thread. */
     p->probe_rc=qurt_user_dma_dmsyncht();
     if (p->probe_rc) return AEE_EUNSUPPORTED;
     if ((dmpoll()&DM0_STATUS_MASK)!=DM0_STATUS_IDLE) return AEE_EFAILED;
@@ -63,7 +76,8 @@ static int prl_dma_drain(prl_dma *p) {
     if (!p->active) return 0;
     const int idle=dma_wait_for_idle();
     const int sync=qurt_user_dma_dmsyncht();
-    /* Successful DMSYNCHT proves there are no remaining posted memory ops, including on the error path. */
+    /* Successful DMSYNCHT proves there are no remaining posted memory ops,
+     * including on the error path. Preserve active if completion is unknown. */
     if (!sync) p->active=0;
     return idle==DMA_SUCCESS&&!sync?0:AEE_EFAILED;
 }

@@ -1,4 +1,9 @@
-/* These operations retain the generic queue's exact count/sequence, timeout, completion and atomic ownership rules; only owner lookup and optional cycle accounting are omitted. */
+/* Producer helpers for an already selected, non-profiled SPSC worker.
+ * The caller selects the same owner as band % workers once per column block.
+ * These operations retain the generic queue's exact count/sequence, timeout,
+ * completion and atomic ownership rules; only owner lookup and optional cycle
+ * accounting are omitted. Worker startup must have succeeded with profile=0.
+ */
 #ifndef PRL_FUSED_MULTI_KNOWN_H
 #define PRL_FUSED_MULTI_KNOWN_H
 #include "fused_multi.h"

@@ -1,4 +1,16 @@
-/* The caller computes the salted seed chain and share bound; no nonce bytes or raw target are silently substituted for these already-derived values. */
+/* Optional protocol-correct final hashes of compact 32-tile bands.
+ *
+ * Every lane is an independent keyed BLAKE3 hash of 16 LE transcript words.
+ * output_mode 1: [global_band][8 digest words][32 tile lanes], 256 u32/band.
+ * output_mode 2: one bitmask u32/global_band; bit lane is digest_LE <= bound_LE.
+ * A global band is rb*(n/64)+band. Within a band lane=rbi*4+cb identifies
+ * tile coordinates row=64*rb+rbi, col=64*band+2*cb.
+ *
+ * keys contains one 8-word LE key per at-most-2048-row attempt. For a batch of
+ * up to thirty-two 2048-row attempts, rb/32 selects the corresponding a_noise_seed.
+ * The caller computes the salted seed chain and share bound; no nonce bytes
+ * or raw target are silently substituted for these already-derived values.
+ */
 #ifndef PRL_FUSED_HASH_IMPL_H
 #define PRL_FUSED_HASH_IMPL_H
 #include <stdint.h>
@@ -12,7 +24,8 @@ typedef struct {
     uint32_t bound[8];
 } prl_hash_options;
 
-/* Comparison is unsigned, most-significant-word first and includes equality at the boundary. */
+/* One scalar result for an entire 32-lane batch. Comparison is unsigned,
+ * most-significant-word first and includes equality at the boundary. */
 static uint32_t prl_hash_hitmask32(const HVX_Vector digest[8],
                                   const uint32_t bound[8]) {
     const HVX_Vector zero=Q6_V_vzero();
@@ -53,7 +66,9 @@ static void prl_hash_flush_compact(const prl_hash_options *options,uint32_t *out
     if (options->output_mode==1) {
         prl_blake3_keyed_block64x32(msg,key,(HVX_Vector *)out+global_band*8);
     } else {
-        /* Put each band's 1KiB digest temporary after ALL compact transcripts: workers own distinct bands and cannot race here. */
+        /* Compact transcript storage uses 2KiB/band inside an allocation of
+         * 16KiB/band. Put each band's 1KiB digest temporary after ALL compact
+         * transcripts: workers own distinct bands and cannot race here. */
         HVX_Vector *digest=(HVX_Vector *)(cum+(size_t)nband*2048)+(size_t)band*8;
         prl_blake3_keyed_block64x32(msg,key,digest);
         out[global_band]=prl_hash_hitmask32(digest,options->bound);

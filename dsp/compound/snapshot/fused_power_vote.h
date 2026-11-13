@@ -6,7 +6,8 @@
 #include "AEEStdErr.h"
 #include "HAP_power.h"
 
-/* Destruction always goes through the official HAP_power_destroy wrapper, never a direct call. */
+/* Only optional firmware API presence is checked here. Destruction always
+ * goes through the official HAP_power_destroy wrapper, never a direct call. */
 extern int HAP_power_set(void *, HAP_power_request_t *) __attribute__((weak));
 
 #define PRL_HMX_VOTE_DIAG_WORDS 24u
@@ -37,7 +38,8 @@ typedef struct prl_hmx_vote {
     int begin_rc, end_rc, dcvs_rc, hmx_rc, destroy_rc;
 } prl_hmx_vote;
 
-/* Policies: 0=DCVS-only control, 1=Q6-derived HMX default, 2=NOM, 3=TUR, 4=MAX. */
+/* Policies: 0=DCVS-only control, 1=Q6-derived HMX default,
+ * 2=NOM, 3=TUR, 4=MAX. No policy changes HMX power on/off. */
 static inline int prl_hmx_vote_begin(prl_hmx_vote *v, unsigned policy) {
     if (!v) return AEE_EBADPARM;
     if (v->context || v->poisoned) {
@@ -97,7 +99,8 @@ static inline int prl_hmx_vote_begin(prl_hmx_vote *v, unsigned policy) {
         request.hmx_v2.perf_mode = HAP_CLK_PERF_HIGH;
         v->hmx_corner = (unsigned)corner;
     }
-    /* pick_default is mutually exclusive with explicit corners, and set_power=FALSE leaves hardware power alone. */
+    /* Both frequency fields stay zero. pick_default is mutually exclusive
+     * with explicit corners, and set_power=FALSE leaves hardware power alone. */
     v->hmx_attempted = 1;
     v->hmx_rc = HAP_power_set(v->context, &request);
     return v->begin_rc = v->hmx_rc;

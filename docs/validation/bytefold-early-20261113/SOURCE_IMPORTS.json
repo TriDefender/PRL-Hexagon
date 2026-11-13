@@ -1,0 +1,306 @@
+{
+  "candidate": "compound_bytefold_early_20261113",
+  "exact_imports": [
+    {
+      "published": "dsp/compound/compact_format.h",
+      "frozen_source": "compact_format.h",
+      "sha256": "feb5d2a93f80e83d27a7cf523b7e612b28d44ec6d9a75a231b3ba299504ce9b0"
+    },
+    {
+      "published": "dsp/compound/compound.idl",
+      "frozen_source": "compound.idl",
+      "sha256": "222b8ff4b1a3263afeb137697af0e7461719c0e54191817501a7f6d46573ba24"
+    },
+    {
+      "published": "dsp/compound/driver.c",
+      "frozen_source": "driver.c",
+      "sha256": "67a65c4200ee368025477b824c36706857abe5becb2a89a0af8ce4c556c4e1a6"
+    },
+    {
+      "published": "dsp/compound/fused_bytefold_early.h",
+      "frozen_source": "fused_bytefold_early.h",
+      "sha256": "87b7a56fda2d9022646aabc6db4dd69de39aba3201a7591f2aff5e91f648deee"
+    },
+    {
+      "published": "dsp/compound/hmx_mm4_deep4_packet.h",
+      "frozen_source": "hmx_mm4_deep4_packet.h",
+      "sha256": "3db4d4b15da03f28203fc0ef7e04a46a10ba7954bd405a62fd555cfac55f7f57"
+    },
+    {
+      "published": "dsp/compound/impl.c",
+      "frozen_source": "impl.c",
+      "sha256": "730b1e8924944308df420d9ae858d2b3404401db34bb7376261deeee19f1e59a"
+    },
+    {
+      "published": "dsp/compound/kernel_api.h",
+      "frozen_source": "kernel_api.h",
+      "sha256": "0d114af358445ff0acbdb8ce1dd8bca4390f32982f717340b484d5b1c7357f15"
+    },
+    {
+      "published": "dsp/compound/kernel_impl.c",
+      "frozen_source": "kernel_impl.c",
+      "sha256": "5f3d934f088149345e6558a2ae0dee54b97b7fd2e2ff7226b078d32aa47c7ee0"
+    },
+    {
+      "published": "dsp/compound/noise_compact_neon.h",
+      "frozen_source": "noise_compact_neon.h",
+      "sha256": "194a61351d1d170c166524b2667e978e3fb020730e9e8f3aac07f1ea5eb1b288"
+    },
+    {
+      "published": "dsp/compound/prep_pool.h",
+      "frozen_source": "prep_pool.h",
+      "sha256": "14f5bb6062817b243fdf8423fc8566d23b32c878342a6382fc4d9a005a90f07d"
+    },
+    {
+      "published": "dsp/compound/protocol.h",
+      "frozen_source": "protocol.h",
+      "sha256": "22fc8c432a5e8ca49c765b8256d00d64a347274683b6b015f8223610a5b2401a"
+    },
+    {
+      "published": "dsp/compound/snapshot/fused.idl",
+      "frozen_source": "snapshot/fused.idl",
+      "sha256": "8f96854fdd828a4720d65efcedf874359bee49f25b6bfb625a4df8407ee62f96"
+    },
+    {
+      "published": "dsp/compound/snapshot/fused_adaptive_export.h",
+      "frozen_source": "snapshot/fused_adaptive_export.h",
+      "sha256": "9cfd1c237abe079d2693d03007fb245ab66fd343f39b90f5ea1e43545cd13ec7"
+    },
+    {
+      "published": "dsp/compound/snapshot/fused_adaptive_shared.h",
+      "frozen_source": "snapshot/fused_adaptive_shared.h",
+      "sha256": "d0e08406659af4baf37dda30abfc04b842f199209f31c0419f7aa46ed6e08990"
+    },
+    {
+      "published": "dsp/compound/snapshot/fused_band.h",
+      "frozen_source": "snapshot/fused_band.h",
+      "sha256": "9485dc3479abfc2c51d15d1eb616fa2908e4a5df38a3c27241e2e1b3a26b443e"
+    },
+    {
+      "published": "dsp/compound/snapshot/fused_blake3_hvx.h",
+      "frozen_source": "snapshot/fused_blake3_hvx.h",
+      "sha256": "1137fd9e88beb7a52829bd8d68dd68835cc2b9bd59962a6df9c29f00adcf4294"
+    },
+    {
+      "published": "dsp/compound/snapshot/fused_corrected.h",
+      "frozen_source": "snapshot/fused_corrected.h",
+      "sha256": "8044064717d43027533239a6e406382865ed305861c2cd64d3becf3035868fc9"
+    },
+    {
+      "published": "dsp/compound/snapshot/fused_dma.h",
+      "frozen_source": "snapshot/fused_dma.h",
+      "sha256": "56efbcc2b06e824abfc020c44944d4e58170b2d0194b531643d767e0eb4ef68e"
+    },
+    {
+      "published": "dsp/compound/snapshot/fused_fold_compact.h",
+      "frozen_source": "snapshot/fused_fold_compact.h",
+      "sha256": "cfd12a95fe4fb78cd47514598fb09a824c6a4ec6d220912fd5f7ec2b45f0d322"
+    },
+    {
+      "published": "dsp/compound/snapshot/fused_grouped.h",
+      "frozen_source": "snapshot/fused_grouped.h",
+      "sha256": "6e8a91eb6baf251f37da1e7c35dcd07137ab5778df2db4b0c54c782d6ff5e23b"
+    },
+    {
+      "published": "dsp/compound/snapshot/fused_hash_impl.h",
+      "frozen_source": "snapshot/fused_hash_impl.h",
+      "sha256": "4d4045a528c2b742f408638a0b7a3de62b14b2770583573ba9c94f136c108ce8"
+    },
+    {
+      "published": "dsp/compound/snapshot/fused_impl.c",
+      "frozen_source": "snapshot/fused_impl.c",
+      "sha256": "50309792674c57b298ee4184657230104b9ddb5dc242a31c1c31bf9733ca4024"
+    },
+    {
+      "published": "dsp/compound/snapshot/fused_layout_compact.h",
+      "frozen_source": "snapshot/fused_layout_compact.h",
+      "sha256": "17b08a638add99bd87971479f5d525c2055e45403ebf46da41dc09b9b8a7ae5c"
+    },
+    {
+      "published": "dsp/compound/snapshot/fused_multi.h",
+      "frozen_source": "snapshot/fused_multi.h",
+      "sha256": "a358021e8fc6283c99ab47503997317b1985ed592c128afa046d01d24bae1adb"
+    },
+    {
+      "published": "dsp/compound/snapshot/fused_multi_known.h",
+      "frozen_source": "snapshot/fused_multi_known.h",
+      "sha256": "521fc2888c944c9dec3b0524c89afa2bd1fb6c754d4a9dc35c1a9bd5b7ca3e85"
+    },
+    {
+      "published": "dsp/compound/snapshot/fused_noise_compact.h",
+      "frozen_source": "snapshot/fused_noise_compact.h",
+      "sha256": "0e5d0fcf9a293769cce523b7c8bf9796a68d72b0dd202b77377f6d9388dc19da"
+    },
+    {
+      "published": "dsp/compound/snapshot/fused_pipeline.h",
+      "frozen_source": "snapshot/fused_pipeline.h",
+      "sha256": "d197b0f5cfe36f3c764841863ab6171053d3453cc8c01339d66ec0b58ba7ec24"
+    },
+    {
+      "published": "dsp/compound/snapshot/fused_power_vote.h",
+      "frozen_source": "snapshot/fused_power_vote.h",
+      "sha256": "10c3b424a8581a89fd43d2fff9d19e7dab1211b958111a9a68c5f7a0d8f7091b"
+    },
+    {
+      "published": "dsp/compound/snapshot/fused_signed_pack.h",
+      "frozen_source": "snapshot/fused_signed_pack.h",
+      "sha256": "4d05482ded380cfbd79557de7f7c9e5871a22f64b08061e1696eeee413d64751"
+    },
+    {
+      "published": "dsp/compound/snapshot/fused_stage.h",
+      "frozen_source": "snapshot/fused_stage.h",
+      "sha256": "95a960bd1c6162dce1b3309a8528704754cb5d341978ae2eba8ef5813facecd3"
+    },
+    {
+      "published": "dsp/compound/snapshot/hmx_mm4.h",
+      "frozen_source": "snapshot/hmx_mm4.h",
+      "sha256": "466e69c6bea7ac7a61de8648b1a2611ce0380bab5f9bb64092bccd8ed2deabe0"
+    },
+    {
+      "published": "dsp/compound/snapshot/hmx_read_fast.h",
+      "frozen_source": "snapshot/hmx_read_fast.h",
+      "sha256": "6af8837ee0eb70008f59ab17b3a79139d03aa0e9be49517c867d5d7374dc5341"
+    },
+    {
+      "published": "dsp/compound/tests/compact_outer_host.c",
+      "frozen_source": "tests/compact_outer_host.c",
+      "sha256": "5497e3bad3c73cbfca9ece94fb063b2ce7e4a3ce422b6e4889fb0ae15f2085b4"
+    },
+    {
+      "published": "miner/blake3/LICENSE_CC0",
+      "frozen_source": "miner_20261113/miner_src/blake3/LICENSE_CC0",
+      "sha256": "a2010f343487d3f7618affe54f789f5487602331c0a8d03f49e9a7c547cf0499"
+    },
+    {
+      "published": "miner/blake3/UPSTREAM.md",
+      "frozen_source": "miner_20261113/miner_src/blake3/UPSTREAM.md",
+      "sha256": "73bea639287160d3ccecb78c44d3aea915a922a0cae3794cf0dcd26c3be47dcf"
+    },
+    {
+      "published": "miner/blake3/blake3.c",
+      "frozen_source": "miner_20261113/miner_src/blake3/blake3.c",
+      "sha256": "b118ddf7cf9e6e5ef3fded72dcb1acf9dfdc4ea923cbe4605900ad6ee9afe1af"
+    },
+    {
+      "published": "miner/blake3/blake3.h",
+      "frozen_source": "miner_20261113/miner_src/blake3/blake3.h",
+      "sha256": "81bbb11ad1909341565dce4914cc0e5c29718eca27e6950b28f9226a91aaf8c5"
+    },
+    {
+      "published": "miner/blake3/blake3_avx2.c",
+      "frozen_source": "miner_20261113/miner_src/blake3/blake3_avx2.c",
+      "sha256": "8b3516a8e42d981a9868ef670b1698f6d10207283086bd810b11cdaac1aca8f1"
+    },
+    {
+      "published": "miner/blake3/blake3_avx2_x86-64_unix.S",
+      "frozen_source": "miner_20261113/miner_src/blake3/blake3_avx2_x86-64_unix.S",
+      "sha256": "a2d95519fd9845cf80252110e21a93124e81c03da836eaac0bca0537be4f8324"
+    },
+    {
+      "published": "miner/blake3/blake3_avx512.c",
+      "frozen_source": "miner_20261113/miner_src/blake3/blake3_avx512.c",
+      "sha256": "46653e718211d883e56d5caa9ded6d9450f2f5b44ebfa81372b3c0be538e9e3c"
+    },
+    {
+      "published": "miner/blake3/blake3_avx512_x86-64_unix.S",
+      "frozen_source": "miner_20261113/miner_src/blake3/blake3_avx512_x86-64_unix.S",
+      "sha256": "ebce9a9ce8cb547be316c4644390b3c2228dda0edcbac9424fdd8829b04eb100"
+    },
+    {
+      "published": "miner/blake3/blake3_dispatch.c",
+      "frozen_source": "miner_20261113/miner_src/blake3/blake3_dispatch.c",
+      "sha256": "134f21550138c0af6312925c988aeee35df287e4119e8ad1d206fccdb2238fe3"
+    },
+    {
+      "published": "miner/blake3/blake3_impl.h",
+      "frozen_source": "miner_20261113/miner_src/blake3/blake3_impl.h",
+      "sha256": "d388dca3574602c8849805ea3c8c0a12d082ac0e428756f305e111942f099af4"
+    },
+    {
+      "published": "miner/blake3/blake3_portable.c",
+      "frozen_source": "miner_20261113/miner_src/blake3/blake3_portable.c",
+      "sha256": "2bc25b0dad67b4329d0b49cfa075ab2b0d04e424addbddc4e9c389c52a192524"
+    },
+    {
+      "published": "miner/blake3/blake3_sse41.c",
+      "frozen_source": "miner_20261113/miner_src/blake3/blake3_sse41.c",
+      "sha256": "1f38e2ca58aa59af094f492f1326957b423d7a25e32daaae159fcc1966949f58"
+    },
+    {
+      "published": "miner/blake3/blake3_sse41_x86-64_unix.S",
+      "frozen_source": "miner_20261113/miner_src/blake3/blake3_sse41_x86-64_unix.S",
+      "sha256": "135048e4a81a6f9e86960b115141874a55954dbfd2cd1e8e9818837b46b498ad"
+    },
+    {
+      "published": "miner/gpu.h",
+      "frozen_source": "miner_20261113/miner_src/gpu.h",
+      "sha256": "d5e049b3a7efa1f52927074236370c7d06fc756786d25800e9bf707637181194"
+    },
+    {
+      "published": "miner/igpu.h",
+      "frozen_source": "miner_20261113/miner_src/igpu.h",
+      "sha256": "3a8c9b1ae78166e2171675a1dd30063784c5cfd4180e362ab71239ca24eb4768"
+    },
+    {
+      "published": "miner/main.c",
+      "frozen_source": "miner_20261113/miner_src/main.c",
+      "sha256": "41bc082cdc08d314cb5b0f44d0d93a318558dc9172a6528dbf89c52a47cd872f"
+    },
+    {
+      "published": "miner/mine.c",
+      "frozen_source": "miner_20261113/miner_src/mine.c",
+      "sha256": "04b3bb25a075300468f22d0c2f997edfae7f217a18be2114dd8f7b5039b89db1"
+    },
+    {
+      "published": "miner/pearl.c",
+      "frozen_source": "miner_20261113/miner_src/pearl.c",
+      "sha256": "de2a36b02499feff7a4ae2ca84b0d66fd8ff32fa351208a203c71a1b26a08db7"
+    },
+    {
+      "published": "miner/pearl.h",
+      "frozen_source": "miner_20261113/miner_src/pearl.h",
+      "sha256": "9b3057581dc0801de91e3582b53f7f92790fb78396cd5e6103d29b5f21989655"
+    },
+    {
+      "published": "miner/proof.c",
+      "frozen_source": "miner_20261113/miner_src/proof.c",
+      "sha256": "329c2f25adb6db83c4428e4e609510241a6dc20901952312d55e9fc20a2f300c"
+    },
+    {
+      "published": "miner/qnpu.h",
+      "frozen_source": "miner_20261113/miner_src/qnpu.h",
+      "sha256": "a31b48a486c59cab1f761f333777be38fcb0b96436e4d9707e518682618fcda7"
+    },
+    {
+      "published": "miner/qnpu_fused.c",
+      "frozen_source": "miner_20261113/miner_src/qnpu_fused.c",
+      "sha256": "593361fa827647472d1ab8fd55b6700484f7d31069a4e64f69180d7b6c76a0da"
+    },
+    {
+      "published": "miner/qnpu_prep_pool.h",
+      "frozen_source": "miner_20261113/miner_src/qnpu_prep_pool.h",
+      "sha256": "2f4ffa83ec6a4649ff51cfc506b64c20dcb5814d242b3dfaebfb8960e2d2a00a"
+    },
+    {
+      "published": "miner/stratum.c",
+      "frozen_source": "miner_20261113/miner_src/stratum.c",
+      "sha256": "6fd32b0b67f5ac1daca24c2c0d96d531849d7ac20b2eb6b9cd35aadd4dbaacae"
+    },
+    {
+      "published": "miner/stratum.h",
+      "frozen_source": "miner_20261113/miner_src/stratum.h",
+      "sha256": "32f8bd81aae5910f18560e1a4079a4c34718f1e62fe4e72ef6ddc82e1a1ff722"
+    },
+    {
+      "published": "miner/app_check.c",
+      "frozen_source": "miner_20261113/app_check.c",
+      "sha256": "d82294595ec501691638075e36cdcd83d3d609bea84dec57ee06ee5cef4686a6"
+    },
+    {
+      "published": "miner/protocol.h",
+      "frozen_source": "miner_20261113/protocol.h",
+      "sha256": "22fc8c432a5e8ca49c765b8256d00d64a347274683b6b015f8223610a5b2401a"
+    }
+  ],
+  "note": "Published build/test paths and App wiring are adapted to this repository. Only applicable C/C headers and interface sources are imported; no toolchains/binaries/pool credentials."
+}

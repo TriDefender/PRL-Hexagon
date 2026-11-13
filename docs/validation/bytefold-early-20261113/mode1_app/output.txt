@@ -1,0 +1,10 @@
+Warning: rpcmem_init is deprecated. For all the targets supported on Hexagon SDK 6.0, this API doesn't need to be called.
+[prl-miner] compound prep pool active: 4 workers
+[prl-miner] compound runtime_deep4_mode=1 runtime_prefetch_order=0 runtime_bytefold_early=1 runtime_bytefold_tag=0x42464501 expected=1
+APP_CHECK_SCALAR_PASSED job=0 nonce=72057594037927920 hits=73 tiles=1024
+APP_CHECK_BATCH_PASSED job=0 batch=0 first=72057594037927920 attempts=32
+APP_CHECK_BATCH_PASSED job=0 batch=1 first=16 attempts=32
+APP_CHECK_SCALAR_PASSED job=1 nonce=617 hits=1024 tiles=1024
+APP_CHECK_BATCH_PASSED job=1 batch=0 first=617 attempts=32
+APP_CHECK_BATCH_PASSED job=1 batch=1 first=649 attempts=32
+APP_CHECK_PASSED jobs=2 batches=4 attempts=128 nonce_wrap=1 scalar_full_attempts=2 network=none

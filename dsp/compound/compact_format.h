@@ -1,6 +1,8 @@
 #ifndef PRL_COMPACT_FORMAT_H
 #define PRL_COMPACT_FORMAT_H
-/* Factor bytes are preinterleaved for 128-byte HVX vlut32: factor[j],factor[j+64]. */
+/* One shared row-major int7 base followed by one record per nonce.
+ * Factor bytes are preinterleaved for 128-byte HVX vlut32: factor[j],factor[j+64].
+ * Indices are 0..127 and nonce occupies the first eight bytes of its padded vector. */
 #define PRL_COMPACT_FLAG 65536
 #define PRL_COMPACT_BASE_BYTES (2048u*2048u)
 #define PRL_COMPACT_TABLE_BYTES (2048u*128u)

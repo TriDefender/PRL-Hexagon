@@ -1,4 +1,22 @@
-/* They never depend on m, flags, active worker count, or staging policy. */
+/* Integer-only VTCM layout proposal; no allocation, device API, or core change.
+ *
+ * All offsets depend only on n and the fixed build-time sizes supplied below.
+ * They never depend on m, flags, active worker count, or staging policy. Thus
+ * an empty-W switch can retain WH, correction, bias, and complement caches.
+ *
+ * The existing prefix (x/res/cum/wh/dv/scratch/ttmp/pipe_raw/bias) is preserved.
+ * Four worker rings, x2, and DMA descriptors precede the optional complement
+ * cache. Ordinary bias256 multi-worker calls no longer allocate an unused
+ * complemented-W matrix and its constant tiles merely to reach their rings.
+ *
+ * Suggested sizes at the integration site:
+ *   { PRL_PIPE_SLOTS*PRL_PIPE_SLOT_BYTES,
+ *     PRL_HMX_BIAS32_CONFIG_BYTES,
+ *     PRL_MULTI_RAW_BYTES(1), PRL_DMA_DESCRIPTOR_BYTES }
+ * PRL_MULTI_MAX_WORKERS must equal PRL_LAYOUT_COMPACT_MAX_WORKERS (4).
+ * The band transport may share the rings when its per-worker span is the same.
+ * This helper does not replace fused_run_core's feature/flag validator.
+ */
 #ifndef PRL_FUSED_LAYOUT_COMPACT_H
 #define PRL_FUSED_LAYOUT_COMPACT_H
 
@@ -30,7 +48,9 @@ static inline uint64_t prl_layout_compact_align(uint64_t value) {
     return (value+UINT64_C(2047))&~UINT64_C(2047);
 }
 
-/* A failed initialization leaves *out untouched. */
+/* Return 0 on success, -1 on invalid dimensions/sizes or uint32 overflow.
+ * A failed initialization leaves *out untouched. Supplies fixed storage for
+ * all four worker rings even when a later call uses fewer workers. */
 static inline int prl_layout_compact_init(prl_layout_compact *out,uint32_t n,
                                          const prl_layout_compact_sizes *sizes) {
     if (!out||!sizes||n<64||n>2048||n%64||
@@ -68,7 +88,16 @@ static inline int prl_layout_compact_init(prl_layout_compact *out,uint32_t n,
     return 0;
 }
 
-/* Take MAX of all live ends, rather than a priority-ordered ternary. */
+/* actual_workers is the runtime count, already clamped to n/64 and at most 4.
+ * use_stage describes the active software stager; a compile-time enabled but
+ * unused stager passes 0. No flag inference changes the fixed offsets.
+ *
+ * Take MAX of all live ends, rather than a priority-ordered ternary. In
+ * particular flags128 must retain the complement+constant tail even when
+ * workers, DMA, or software staging also need earlier storage. It therefore
+ * includes the address span of the reserved raw/DMA regions before that tail,
+ * without enabling or executing DMA. Empty gaps are not separate live buffers.
+ */
 static inline int prl_layout_compact_need(const prl_layout_compact *p,uint32_t flags,
         uint32_t actual_workers,int use_stage,uint32_t *out_need) {
     if (!p||!out_need||p->n<64||p->n>2048||p->n%64||flags>65535u||
@@ -105,7 +134,10 @@ static inline int prl_layout_compact_need(const prl_layout_compact *p,uint32_t f
     return 0;
 }
 
-/* On a capacity failure (valid sizes), *out_cfg still reports the reserved cfg base. */
+/* Same 256-byte cfg placement as fused_run_core. Return 0 iff need fits before
+ * cfg; return -1 for insufficient capacity or invalid cfg arguments. On a
+ * capacity failure (valid sizes), *out_cfg still reports the reserved cfg base.
+ */
 static inline int prl_layout_compact_fit(uint32_t need,uint32_t vtcm_bytes,
                                         uint32_t cfg_bytes,uint32_t *out_cfg) {
     if (!out_cfg||!cfg_bytes||cfg_bytes>vtcm_bytes) return -1;

@@ -14,7 +14,7 @@
 
 | 分支 | 内核 | 实测吞吐（真实矿池，1 秒窗口） | 说明 |
 |---|---|---|---|
-| `main` | deep4 compound（deep1） | 7.081 TMAC/s（19 窗均值） | 当前最佳：同轮 A/B 比基线高 +1.61%，App 默认载荷 |
+| `main` | early byte-fold + deep1 / PF0 / G16 | 6.990 / 6.916 TMAC/s（两轮分开统计） | 当前默认：对同组旧 fold 提升 +8.58% / +10.49%，共 158 个完整窗口 |
 | `v28` | row-first + L2FETCH，G16 | 7.1–7.4 TMAC/s（历史短窗） | 正式基线版本，长期真机验证最充分 |
 | `v27` | 因子预取 | ≈6.04 TMAC/s | 历史版本 |
 | `v26` | 跨 slice 预取 | ≈5.68 TMAC/s | 历史版本 |
@@ -22,7 +22,7 @@
 | `v24` | 紧凑输入 | ≈2.01 TMAC/s | 历史版本 |
 
 性能数字均为特定真机上的短窗口实测，受温度、时钟驻留和热漂移影响，不代表持续稳态，也不构成对不同设备的承诺。
-deep4 的 7.081 vs 6.969 TMAC/s 来自同一轮 ABBA 交错测量；v24–v28 的数字来自各自的 10×1 秒窗口测量，轮间条件不同，仅供了解版本间的相对进步。
+当前 main 的数据来自相反顺序 ABBA / BAAB 两组真实池对照，分别为 6.438→6.990、6.259→6.916 TMAC/s；固定 4 个 ARM prep workers，每腿 30 秒，未充电并持续简单风冷。两组都有热降频，不与历史冷机短窗横比或累乘增益。完整 CPU 对拍和实际 adapter 检查通过，share 提交仍未验证。见[验证记录](docs/validation/bytefold-early-20261113/README.md)。
 
 ## 硬件与系统要求
 
@@ -113,7 +113,7 @@ adb shell am start -n dev.prl.npuminer/.MainActivity
 ```
 
 `miner/tests/` 内含官方 golden 向量与 mock 矿池（`mockpool.py`），可在推送前做离线校验。
-`payloads/app-check` 是独立的设备端批量检查器，可在 adb 环境下对完整 nonce 批次做 CPU 对拍。
+`payloads/app-check` 是实际矿工 adapter 检查器（M=2048,N=64,K=2048）；`payloads/bytefold-batch32-driver` 覆盖生产尺寸 M=2048,N=1024,K=2048 的 32 nonce 全量 commitment/raw TT/digest/mask CPU 对拍。手动运行时设置 `PRL_EXPECT_BYTEFOLD_EARLY=1`，以 payload 目录为 CWD 和分号分隔的 `ADSP_LIBRARY_PATH` 首项；App 已设置相同约束。
 
 ## 已知限制
 

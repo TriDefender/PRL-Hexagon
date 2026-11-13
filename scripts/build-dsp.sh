@@ -62,9 +62,9 @@ if (( ${#PRL_KERNEL_MODES[@]} == 0 )); then
   link_kernel "$BUILD/dsp/kernel.o" "$OUT/$PRL_SKEL_LIB"
 else
   for mode in "${PRL_KERNEL_MODES[@]}"; do
-    compile_kernel "$BUILD/dsp/kernel_deep$mode.o" -DPRL_MM4_DEEP="$mode"
+    compile_kernel "$BUILD/dsp/kernel_mode$mode.o" "-D${PRL_MODE_DEFINE}=$mode"
     if [[ "$mode" == "${PRL_PACKAGE_MODE:?}" ]]; then
-      link_kernel "$BUILD/dsp/kernel_deep$mode.o" "$OUT/$PRL_SKEL_LIB"
+      link_kernel "$BUILD/dsp/kernel_mode$mode.o" "$OUT/$PRL_SKEL_LIB"
     fi
   done
 fi

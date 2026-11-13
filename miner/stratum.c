@@ -1,6 +1,17 @@
 /*
- * stratum.c — Pearl pool client speaking the community stratum dialects
- * (object = HeroMiners/LuckyPool, kryptex = jsonrpc-2.0 subscribe/authorize).
+ * stratum.c — Pearl pool client (the stratum dialect documented by the
+ * community miners): authorize-first JSON lines, object-form `mining.notify`
+ * jobs (job_id, 76-byte header hex, big-endian 256-bit share target, height,
+ * cert_version) and `mining.submit` shares carrying base64(bincode(PlainProof))
+ * in the `plain_proof` field.
+ *
+ * Dialects:
+ *   object  — HeroMiners / LuckyPool: authorize {wallet, worker, agent};
+ *             submit {wallet, worker, job_id, plain_proof}
+ *   kryptex — mining.subscribe ["agent"], mining.authorize ["wallet.worker", "x"],
+ *             every frame carries "jsonrpc":"2.0"; submit {worker: "wallet.worker", ...}
+ *
+ * TLS pools need `--tls` (OpenSSL build); HeroMiners' 1200 also speaks plain TCP.
  */
 #define _POSIX_C_SOURCE 200112L
 #define _DEFAULT_SOURCE
@@ -225,8 +236,9 @@ int stratum_send_submit(stratum_t *s, const char *job_id, const char *proof_b64)
 }
 
 int stratum_connect(stratum_t *s) {
-    /* drop any previous connection first (reconnects would otherwise leak one
-     * fd and one SSL object per attempt) */
+    /* drop any previous connection first (reconnects would otherwise leak
+     * one fd — and one SSL object — per attempt; the idle timeout below makes
+     * this a regular occurrence on quiet pools) */
     pthread_mutex_lock(&s->wlock);
     stratum_disconnect(s);
     pthread_mutex_unlock(&s->wlock);
@@ -322,7 +334,10 @@ void stratum_disconnect(stratum_t *s) {
     if (s->fd >= 0) { close(s->fd); s->fd = -1; }
 }
 
-/* returns 0 = new job in *job_out, 1 = other message handled internally, <0 = connection error */
+/* read one line; classifies replies vs jobs. Returns:
+ *   0  new job (copied into *job_out)
+ *   1  other message (authorize reply, submit reply, ...) — handled internally
+ *  <0  connection error */
 int stratum_poll(stratum_t *s, struct stratum_job *job_out) {
     char *line = malloc(MAX_LINE);
     if (!line) abort();

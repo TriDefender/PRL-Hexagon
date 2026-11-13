@@ -12,8 +12,8 @@ android {
         applicationId = "dev.prl.npuminer"
         minSdk = 31
         targetSdk = 34
-        versionCode = 6
-        versionName = "deep4"
+        versionCode = 7
+        versionName = "bytefold-early"
     }
 
     signingConfigs {

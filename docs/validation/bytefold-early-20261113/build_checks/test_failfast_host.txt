@@ -1,0 +1,20 @@
+[prl-miner] compound prep pool active: 4 workers
+[prl-miner] compound runtime_deep4_mode=1 runtime_prefetch_order=0 runtime_bytefold_early=0 runtime_bytefold_tag=0x42464500 expected=0
+[prl-miner] compound prep pool active: 4 workers
+[10:24:23] npu job host-tag-magic-fault ready (shape 2048x64x2048)
+[10:24:23] compound DSP batching active: 32 attempts per FastRPC call
+[prl-miner] compound DSP runtime bytefold tag invalid tag=0x44444600
+[10:24:23] compound preparation/RPC failed rc=-1; stopping miner without fallback
+[prl-miner] compound prep pool active: 4 workers
+[10:24:23] npu job host-tag-mode-fault ready (shape 2048x64x2048)
+[10:24:23] compound DSP batching active: 32 attempts per FastRPC call
+[prl-miner] compound DSP runtime bytefold mode mismatch expected=0 actual=1 tag=0x42464501
+[10:24:23] compound preparation/RPC failed rc=-1; stopping miner without fallback
+[10:24:24] npu job host-result-fault ready (shape 2048x64x2048)
+[10:24:24] compound DSP batching active: 32 attempts per FastRPC call
+[10:24:24] compound result 0 was unavailable; stopping miner
+[10:24:24] npu job host-rpc-fault ready (shape 2048x64x2048)
+[10:24:24] compound DSP batching active: 32 attempts per FastRPC call
+[prl-miner] compound DSP RPC failed rc=-91 (0xffffffa5); payload ignored
+[10:24:24] compound preparation/RPC failed rc=-91; stopping miner without fallback
+FAILFAST_HOST_PASSED production_worker=1 real_compound_adapter=1 result_failure_fatal=1 injected_compound_rpc_rc=-91 runtime_tag_magic_rejected=1 runtime_tag_expected_order_rejected=1 tag_fault_rpc_delta=1 tag_fault_fused_rpc_delta=0 tag_fault_result_reads=0 tag_fault_attempts=0 tag_fault_shares=0 compound_rpc_delta=1 fused_rpc_delta=0 result_reads=0 attempts=0 fatal_exit=2 drain=1 drain_rpc_delta=0 share_submits=0 HMX_simulated=0

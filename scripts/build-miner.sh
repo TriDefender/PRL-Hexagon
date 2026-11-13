@@ -50,4 +50,11 @@ LIBS=(
   "$B3/blake3.c" "$B3/blake3_dispatch.c" "$B3/blake3_portable.c" "$B3/blake3_neon.c" \
   "${LIBS[@]}" -o "$OUT/app-check"
 
-sha256sum "$OUT/libprlminer.so" "$OUT/app-check"
+# Independent full-size commitment/raw-TT/all-digest/all-mask CPU comparison.
+"$CC" "${CFLAGS[@]}" -I"$ROOT/dsp/compound" \
+  "$ROOT/dsp/compound/driver.c" "$BUILD/arm_gen/${PRL_SERVICE}_stub.c" \
+  "$M/pearl.c" "$B3/blake3.c" "$B3/blake3_dispatch.c" \
+  "$B3/blake3_portable.c" "$B3/blake3_neon.c" \
+  "${LIBS[@]}" -o "$OUT/bytefold-batch32-driver"
+
+sha256sum "$OUT/libprlminer.so" "$OUT/app-check" "$OUT/bytefold-batch32-driver"

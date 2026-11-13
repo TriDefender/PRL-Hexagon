@@ -1,4 +1,18 @@
-/* Only use after the u8 offset correction has already been applied by HMX (bias export or the exact corrected-MM variant). */
+/* Compact, entirely vector-based transcript folding for corrected HMX output.
+ *
+ * Only use after the u8 offset correction has already been applied by HMX
+ * (bias export or the exact corrected-MM variant). Subtraction cannot be moved
+ * after XOR reduction on uncorrected accumulators.
+ *
+ * Input: four 2048-byte planes of one 64x32 int32 tile, low byte first.
+ * Scratch: [band][slice16][rbi8 * cb4 words], one 128B vector per slice.
+ * A band needs 2048 bytes instead of the expanded fold's 16384 bytes.
+ * Each even half initializes its 16 vectors; the odd half XORs them.
+ *
+ * No vector/scalar transfers, scalar data gathers, or heap allocation occur.
+ * Byte-level V79 PRM p300/301 simulation checks both compression and the final
+ * transpose with a distinct tag for every source byte (2048 output bytes).
+ */
 #ifndef PRL_FUSED_FOLD_COMPACT_H
 #define PRL_FUSED_FOLD_COMPACT_H
 
@@ -12,7 +26,11 @@ static inline HVX_Vector prl_compact_deal_lo(HVX_Vector a,HVX_Vector b,int width
     return Q6_V_lo_W(Q6_W_vdeal_VVR(b,a,-width));
 }
 
-/* Four reduced row vectors have the four desired folds in even word lanes 0/2/4/6, repeated every eight words. */
+/* Four reduced row vectors have the four desired folds in even word lanes
+ * 0/2/4/6, repeated every eight words. Odd lanes contain other XOR groups and
+ * must be discarded. The first deal selects even words; subsequent deals
+ * remove the remaining 16-byte repeats. Four rows remain, each repeated twice.
+ */
 static inline HVX_Vector prl_compact_four(HVX_Vector a,HVX_Vector b,
                                          HVX_Vector c,HVX_Vector d) {
     HVX_Vector ab=prl_compact_deal_lo(prl_corrected_reduce_columns(a),
@@ -48,7 +66,11 @@ static void prl_compact_fold_raw(int s,int cb,const uint8_t *raw,
     *dst=result;
 }
 
-/* Each resulting output vector contains all sixteen slice words of two adjacent tiles, matching the established TT format. */
+/* Full 16x32 word transpose. Each resulting output vector contains all sixteen
+ * slice words of two adjacent tiles, matching the established TT format.
+ * Named registers keep all sixteen input vectors in the vector register file;
+ * no array of temporaries is used, avoiding accidental spills to the stack.
+ */
 static void prl_compact_flush_band(uint32_t *out,int rb,int band,int nband,
                                    const uint8_t *transcript_scratch) {
     const HVX_Vector *p=(const HVX_Vector *)transcript_scratch+(size_t)band*16;

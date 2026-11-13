@@ -1,7 +1,22 @@
 /*
- * proof.c — PlainProof construction and wire encoding: multileaf Merkle proofs
- * serialized as bincode fixint little-endian (layout confirmed against the
- * official zk-pow Rust serializer), then standard padded base64.
+ * proof.c — PlainProof construction and wire encoding.
+ *
+ * A share opens the tile's 8 rows of A and 16 rows of Bᵀ with pearl_blake3
+ * multileaf Merkle proofs keyed by the job key, and serializes the PlainProof
+ * exactly like the official FFI:
+ *
+ *   bincode fixint little-endian of
+ *     PlainProof { m: u64, n: u64, k: u64, noise_rank: u64,
+ *                  a: MatrixMerkleProof, bt: MatrixMerkleProof, moe: Option }
+ *     MatrixMerkleProof { proof: MerkleProof, row_indices: Vec<u64> }
+ *     MerkleProof { leaf_data: Vec<Vec<u8>>,     // u64 count, per chunk u64(1024) + bytes
+ *                   leaf_indices: Vec<u64>, total_leaves: u64,
+ *                   root: [u8;32], siblings: Vec<[u8;32]> }
+ *     moe = 0x00 (None)
+ *   then standard base64 (with padding).
+ *
+ * The byte layout was confirmed against the official Rust serializer
+ * (zk-pow PlainProof::to_base64 at the pinned revision).
  */
 #include "pearl.h"
 
@@ -11,7 +26,7 @@
 
 /* caps sized for the supported shapes (m,n multiples of 64, 2048 <= k <= 4096):
  * the Bᵀ proof opens 16 rows of k bytes -> at most 16*(k/1024) <= 64 chunks;
- * siblings stay well below 128 at those sizes. */
+ * siblings stay well below 128 at those sizes. Enforced in-loop, not after. */
 #define MAX_PROOF_LEAVES 64
 #define MAX_PROOF_SIBS 128
 
@@ -73,7 +88,8 @@ static char *b64_encode(const uint8_t *in, size_t len, size_t *out_len) {
 
 /* ---- one matrix's multileaf proof --------------------------------------- */
 
-/* Returns 0 when the covering chunk indices exceed `cap` (the caller refuses the share). */
+/* collect the sorted unique chunk indices covering `rows` of a k-wide matrix.
+ * Returns 0 when they exceed `cap` (the caller refuses the share). */
 static size_t leaf_indices_for_rows(const uint32_t *rows, size_t nrows, uint32_t k,
                                     uint64_t *leaves, size_t cap) {
     size_t n = 0;

@@ -1,0 +1,30 @@
+{
+  "kernel_objects": [
+    {
+      "mode": 0,
+      "sha256": "d88089003c5254664f90c513957f33e6092666a434963385fc443280ae7d3f02",
+      "exact_match_to_device_tested_object": true
+    },
+    {
+      "mode": 1,
+      "sha256": "069758121dec040da8406c6dd29047ee65b52cbe85dd7a989443b36cf6f597c7",
+      "exact_match_to_device_tested_object": true
+    }
+  ],
+  "rebuilt_payloads": {
+    "app-check": "b74972f9d2443c0c139730f84272e76d6cabc12877079bfbe3d68361e20cb298",
+    "bytefold-batch32-driver": "7c66f5a4430c81dd9ab158f305b7701e6326e1660e8e5e7ddc53e1db31f3cb76",
+    "libprl_compound_bytefold_batch_skel.so": "980dd7806a762de292a38a0a64875305e380e3474415ce600667c346f2af866f",
+    "libprl_fused_fused_skel.so": "79f91caf0f4f5ed11b0112926e1e7556093e5ab6864540ebe84784e44c21faf3",
+    "libprlminer.so": "9a8d368cad43d0dcfceeb369939f27cda69c5b1bb3d3b64c45ad8c18d4522eaa"
+  },
+  "host_checks": [
+    "test_failfast_source.py",
+    "test_failfast_host.py",
+    "test_app_check_host.py",
+    "test_compact_outer_host.py"
+  ],
+  "initial_test_path_failure": "Preserved in build_checks/test_failfast_host_initial_path_failure.txt; fixed ../miner_src/main.c to ../main.c, rerun exit0.",
+  "device_scope": "Measurements and full correctness cover frozen candidate. Publication rebuild has identical kernel objects and matching source imports; rebuilt payloads/APK are not separately device-tested.",
+  "binary_policy": "No binaries are committed or released in this push."
+}

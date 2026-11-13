@@ -1,6 +1,15 @@
 /*
  * mine.c — the mining kernel: per-attempt orchestration, band-blocked sliced
  * GEMM with per-slice transcript folds, digest checks.
+ *
+ * Work layout per attempt (m rows of A', n rows of B'ᵀ, k columns, r = 128):
+ *   for each 64-row band of A' (holds 8 tile row-bases; 4 col-bases per 64 cols):
+ *     for each slice s in 0..k/r:
+ *       acc_band[i][j] += dot(A'[band_i][slice], B'ᵀ[j][slice])      (i32)
+ *       fold each tile: XOR of its 128 cumulative acc cells
+ *         -> t[s mod 16] = rotl(t[s mod 16], 13) ^ fold
+ *     after the last slice: digest = blake3_keyed(a_noise_seed, t) per tile;
+ *     hit when the little-endian u256 digest <= share bound.
  */
 #define _GNU_SOURCE
 #include "pearl.h"
@@ -134,6 +143,7 @@ static void run_band(struct pr_thread_ws *w, uint32_t band) {
             }
         }
 
+        /* fold every tile of the band against the cumulative accumulators */
         uint32_t s16 = s % PEARL_TRANSCRIPT_WORDS;
         for (uint32_t rb = 0; rb < PEARL_ROW_BASES_PER_BAND; rb++) {
             for (uint32_t cb = 0; cb < PEARL_COL_BASES_PER_BAND; cb++) {

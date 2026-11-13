@@ -29,7 +29,7 @@ static int clocks(uint32_t *d,unsigned at) {
     return rc||hrc?AEE_EFAILED:0;
 }
 
-int prl_compound_deep4_batch_run(int attempts,int n,int flags,int output_mode,
+int prl_compound_bytefold_batch_run(int attempts,int n,int flags,int output_mode,
                           const byte *X,int XLen,const byte *W,int WLen,
                           const int *keys_and_bound,int paramsLen,
                           int *result,int resultLen,uint64 *cycles) {
@@ -44,7 +44,8 @@ int prl_compound_deep4_batch_run(int attempts,int n,int flags,int output_mode,
     if (output_mode==0 && (attempts!=32 || n!=1024 || !compact || prepare ||
         (flags!=(35698|PRL_COMPACT_FLAG) && flags!=(35698|PRL_COMPACT_FLAG|4))))
         return AEE_EBADPARM;
-    /* Signed-RM whole-M repacking cannot reinterpret a concatenation of per-attempt slice-major arrays. */
+    /* Each attempt is independently prepacked. Signed-RM whole-M repacking
+     * cannot reinterpret a concatenation of per-attempt slice-major arrays. */
     if ((flags&required)!=required||!(flags&1536)||(flags&128)||(flags&8192))
         return AEE_EBADPARM;
     const size_t words_per_band=output_mode==0?512u:(output_mode==1?256u:1u);
@@ -101,7 +102,8 @@ int prl_compound_deep4_batch_run(int attempts,int n,int flags,int output_mode,
         summary[CB_CORE_RC]=(uint32_t)rc;
         if (prl_compound_kernel_poisoned()) g_poison=1;
         if (rc) break;
-        /* The temporary tail may overlap the next chunk's first 64 result words. */
+        /* This call returned only after all output writers were quiet. The
+         * temporary tail may overlap the next chunk's first 64 result words. */
         uint32_t diag[64];
         memcpy(diag,result+(size_t)base*per_attempt+chunk_words,sizeof(diag));
         core_ticks+=get64(diag,56);kernel_ticks+=get64(diag,58);

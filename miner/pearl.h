@@ -1,5 +1,28 @@
 /*
  * pearl.h — A CPU miner ("C pickaxe") for Pearl (PRL), the Proof-of-Useful-Work L1.
+ *
+ * Implements the consensus "pearlhash" (certificate V3, salted): a noisy int8
+ * matrix multiplication whose per-tile transcripts are BLAKE3-hashed into
+ * lottery tickets. Spec extracted from the official zk-pow / pearl-blake3
+ * crates (pearl-research-labs/pearl @ ISC) and the spm-cpuref reference.
+ *
+ * Layout of one mining attempt (all miner-chosen, pool fixes only the header
+ * and the share target):
+ *   1. pick a seed -> int7 matrices A (m×k), Bᵀ (n×k), entries in [-64, 63]
+ *   2. commit: job_key = blake3(header76 || config52)
+ *              root_a/b = keyed-blake3(job_key, pad1024(matrix bytes))
+ *              bound_a/b = salted roots (SEED_SALT_A/B, dimension committed)
+ *              b_noise_seed = blake3(job_key || bound_b)
+ *              a_noise_seed = blake3(b_noise_seed || bound_a)
+ *   3. noise: E_A = A_L·A_R, E_B = B_L·B_R (rank r = 128, BLAKE3 PRNG)
+ *      A' = A + E_A, B'ᵀ = Bᵀ + E_Bᵀ (exact s8)
+ *   4. per 64-row band of the output: sliced GEMM C' += A'·B'ᵀ in i32;
+ *      after every r-wide slice each 8×16 hash tile XOR-folds its cumulative
+ *      128 accumulators into transcript word s mod 16 (rotl 13 before xor);
+ *      after the last slice digest = blake3_keyed(a_noise_seed, transcript)
+ *      and a tile is a hit when the little-endian u256 digest <= bound.
+ *   5. build the PlainProof (multileaf Merkle openings of the tile's rows)
+ *      and submit bincode(fixint LE) -> base64 as `plain_proof`.
  */
 #ifndef PEARL_H
 #define PEARL_H
@@ -64,7 +87,8 @@ void pr_matrix_root(const uint8_t key[32], const uint8_t *data, size_t len, uint
 
 /* ---- commitment --------------------------------------------------------- */
 
-/* patch_chunk recomputes one 1024B chunk CV plus its path (~10 hashes), so a
+/* host-side incremental pearl-blake3 Merkle tree over a matrix buffer.
+ * patch_chunk recomputes one 1024B chunk CV plus its path (~10 hashes), so a
  * nonce change costs microseconds instead of a full re-hash. */
 typedef struct pr_htree pr_htree;
 pr_htree *pr_htree_new(const uint8_t key[32], const uint8_t *data, size_t len);
@@ -145,7 +169,11 @@ typedef struct {
     size_t b64_len;
 } pr_share;
 
-/* a16/ap are unused here; a/bt must hold the base matrices. */
+/*
+ * Builds the share for tile (t_rows, t_cols): multileaf Merkle openings of the
+ * tile's 8 A rows and 16 Bᵀ rows, serialized as bincode (fixint LE) PlainProof.
+ * a16/ap are unused here; a/bt must hold the base matrices.
+ */
 bool pr_build_share(const pr_attempt_mats *am, const pr_commitment *c,
                     uint32_t t_rows, uint32_t t_cols, pr_share *out);
 void pr_share_free(pr_share *s);

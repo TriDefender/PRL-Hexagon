@@ -32,7 +32,7 @@ data class SelfCheckState(
 
 /**
  * A device is "supported" only if all blocking checks pass, including a real
- * FastRPC run of the bundled deep4 skeleton that is compared bit-exactly
+ * FastRPC run of the bundled HMX skeleton that is compared bit-exactly
  * against the CPU golden vectors.
  */
 class SelfCheck(private val miner: MinerRunner) {

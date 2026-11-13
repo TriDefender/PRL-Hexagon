@@ -1,4 +1,26 @@
-/* main.c — prl-miner: a CPU "pickaxe" for Pearl (PRL). */
+/*
+ * main.c — prl-miner: a CPU "pickaxe" for Pearl (PRL).
+ *
+ *   prl-miner --selftest miner/tests/golden.txt   bit-exact checks vs official vectors
+ *   prl-miner --bench [--shape 256,256,2048] [-t N]
+ *   prl-miner -o br.pearl.herominers.com:1200 -u prl1... -w rig1 [options]
+ *   prl-miner --job <header76hex>,<target64hex> --seed 1   one offline attempt
+ *
+ * Options:
+ *   -o, --pool URL        host:port ("tls://" prefix or --tls for TLS pools)
+ *   -u, --wallet ADDR     PRL taproot address (prl1...)
+ *   -w, --worker NAME     worker name (default "cpu")
+ *       --dialect NAME    object | kryptex   (default object)
+ *       --agent STR       user agent (default prl-c-miner/<ver>)
+ *   -t, --threads N       mining threads (default: nproc)
+ *       --shape M,N,K     attempt shape (default 256,256,2048; M,N,K multiples of 64)
+ *       --seed N          first attempt seed (default: time)
+ *       --job A,B         offline: header76 hex, target 64-hex (big-endian)
+ *       --selftest FILE   run the bit-exact selftest against the golden file
+ *       --bench SECONDS   mine against a synthetic never-hitting job and report rate
+ *       --tls             force TLS (needs an OpenSSL build)
+ *   -v                    verbose
+ */
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE
 #endif
@@ -353,8 +375,9 @@ static void selftest(const char *golden_path) {
     }
 
 #ifdef WITH_GPU
-    /* The nonce is reconstructed from the golden A's first 8 int7 bytes (the
-     * GPU patches exactly those into chunk 0), so device noise, transcripts,
+    /* GPU path vs golden: rebuild a golden case through the CUDA backend. The
+     * nonce is reconstructed from the golden A's first 8 int7 bytes (the GPU
+     * patches exactly those into chunk 0), so device noise, transcripts,
      * digests and the final share must be byte-identical to the CPU/oracle. */
     if (pr_gpu_device_count() > 0) {
         golden_case *gc = NULL;
@@ -443,7 +466,8 @@ static void selftest(const char *golden_path) {
 #endif
 
 #ifdef WITH_IGPU
-    /* The KAT (device keyed-BLAKE3 vs the vendored lib) gates the kernel port itself. */
+    /* iGPU path vs golden: same contract as the GPU section. The KAT (device
+     * keyed-BLAKE3 vs the vendored lib) gates the kernel port itself. */
     {
         char reason[192];
         int ndev = pr_igpu_device_count(reason, sizeof reason);
@@ -557,9 +581,9 @@ static void selftest(const char *golden_path) {
 #endif
 
 #ifdef WITH_QNPU
-    /* The QNN graph runs the sliced int8 GEMM on the HTP; noise, fold and
-     * digest stay on the CPU, so a byte-identical digest proves the NPU
-     * MatMuls are exact. */
+    /* NPU path vs golden: same contract as the GPU section. The QNN graph runs
+     * the sliced int8 GEMM on the HTP; noise, fold and digest stay on the CPU,
+     * so a byte-identical digest proves the NPU MatMuls are exact. */
     {
         char reason[192];
         int ndev = pr_qnpu_device_count(reason, sizeof reason);
@@ -954,10 +978,11 @@ static void qnpu_submit_result(struct mine_shared *ms, pr_qnpu_ctx *g,
     }
 }
 
-/* The backend pipelines: attempt_pipe(nonce) queues this attempt on the NPU
+/* the NPU is a single worker: one thread drives attempts through the QNN ctx.
+ * The backend pipelines: attempt_pipe(nonce) queues this attempt on the NPU
  * and returns the PREVIOUS attempt's hits, so the NPU executes while this
  * thread builds the next noise / submits shares — no NPU idle between
- * attempts. */
+ * attempts. Hits are attributed via last_nonce. */
 static void *qnpu_miner_thread(void *arg) {
     struct { struct mine_shared *ms; unsigned id; } *a = arg;
     struct mine_shared *ms = a->ms;
@@ -997,8 +1022,9 @@ static void *qnpu_miner_thread(void *arg) {
         }
 
         if (!have_job || memcmp(lh, curhdr, 76) != 0 || memcmp(lt, curtgt, 32) != 0) {
-            /* Otherwise a completed hit can be returned after curjid changes
-             * and be submitted under the new job id. */
+            /* Drain the old job before replacing its B' graph. Otherwise a
+             * completed hit can be returned after curjid changes and be
+             * submitted under the new job id. */
             if (have_job && has_last) {
                 int old_nh = pr_qnpu_drain(g, coords, digests);
                 if (old_nh > 0) {

@@ -1,4 +1,10 @@
-/* gpu.h — CUDA backend for the PRL miner (pearlhash V3). */
+/* gpu.h — CUDA backend for the PRL miner (pearlhash V3).
+ *
+ * One attempt = patch a 56-bit nonce into A chunk 0 (host), incrementally
+ * update the A Merkle root, then the GPU rebuilds the A-side rank-128 noise,
+ * A' = A + E_A, runs the sliced int8 GEMM with per-slice transcript folds,
+ * hashes each tile's digest and reports tiles meeting the share bound.
+ * B'ᵀ and its noise are built once per job. */
 #ifndef PRL_GPU_H
 #define PRL_GPU_H
 
@@ -22,13 +28,16 @@ int pr_gpu_device_count(void);
 pr_gpu_ctx *pr_gpu_new(uint32_t m, uint32_t n, uint32_t k, char *err, size_t errcap);
 void pr_gpu_free(pr_gpu_ctx *ctx);
 
-/* Safe to call again when the pool job (header) changes. */
+/* full job (re)setup: fills A_base/Bᵀ, computes the commitment chain, builds
+ * B-side noise + B'ᵀ on the device. Safe to call again when the pool job
+ * (header) changes. */
 int pr_gpu_set_job(pr_gpu_ctx *ctx, const uint8_t header76[76], char *err, size_t errcap);
 
 /* upload the share bound for the current pool job (32 bytes = U256 little-endian) */
 void pr_gpu_set_bound(pr_gpu_ctx *ctx, const uint8_t bound_le[32]);
 
-/* coords[i] = t_rows | ((uint64_t)t_cols << 32); digests = 64 × 32 bytes. */
+/* one attempt; returns the number of hits (capped at PRL_GPU_MAXHITS).
+ * coords[i] = t_rows | ((uint64_t)t_cols << 32); digests = 64 × 32 bytes. */
 int pr_gpu_attempt(pr_gpu_ctx *ctx, uint64_t nonce, uint64_t *coords, uint8_t *digests);
 
 /* state needed to build the PlainProof for a hit on the host */

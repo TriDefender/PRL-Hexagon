@@ -1,4 +1,17 @@
-/* For every K=128 slice, X=A+128 and C=bitwise_not(W)=-W-1 give X*W + 128*C + 16384 = A*W. */
+/* Exact signed-int8 products retained in HMX without a per-element HVX bias.
+ *
+ * For every K=128 slice, X=A+128 and C=bitwise_not(W)=-W-1 give
+ *     X*W + 128*C + 16384 = A*W.
+ * The final constant is one K=32 MM with activation=128 and weight=4.
+ * This identity covers W=-128 without overflow or an int7 restriction.
+ *
+ * Once HMX itself contains the corrected prefix, XOR reduction commutes with
+ * byte-plane unpacking. Reduce the eight row groups before unpacking, so only
+ * eight row vectors (instead of all 64) need byte -> int32 shuffles.
+ *
+ * Helpers require the existing HMX lock and initialized VTCM, -mhmx, 128-byte
+ * HVX vectors. They do not allocate, acquire resources, or change the lock.
+ */
 #ifndef PRL_FUSED_CORRECTED_H
 #define PRL_FUSED_CORRECTED_H
 
@@ -8,7 +21,14 @@
 #include "hvx_hexagon_protos.h"
 #include "hexkl_micro.h"
 
-/* WH and complement are 128-byte aligned; constant activation is 2048-aligned. */
+/* Extra storage: wh_bytes for complemented weights, 2048 bytes for a constant
+ * activation tile, and 1024 bytes (caller may reserve 2048) for constant WH.
+ * WH and complement are 128-byte aligned; constant activation is 2048-aligned.
+ * Packing commutes with bitwise NOT because it permutes all input weight bits.
+ * The constant weight is packed with the official conversion, avoiding any
+ * assumption that a constant row-major byte has the same packed WH encoding.
+ * Call again whenever the original WH cache changes.
+ */
 static int prl_corrected_prepare(uint8_t *vtcm, uint32_t wh,
                                  uint32_t wh_bytes, uint32_t complement,
                                  uint32_t constant_activation,
@@ -32,7 +52,11 @@ static inline void prl_corrected_mm(uint8_t *vtcm, uint32_t act,
                      :: "r"(a),"r"(w),"r"(31),"r"(896):"memory");
 }
 
-/* Keep the accumulator across slices; clear once before s0. */
+/* act points to this slice's 4 contiguous 2048-byte activation K tiles;
+ * wh and complement point to this slice/column block's 4 contiguous 1024-byte
+ * weight K tiles. Keep the accumulator across slices; clear once before s0.
+ * Nine HMX MMs execute for the four useful MMs in this K=128 slice.
+ */
 static inline void prl_corrected_slice(uint8_t *vtcm, uint32_t act,
                                       uint32_t wh, uint32_t complement,
                                       uint32_t constant_activation,
@@ -61,7 +85,13 @@ static inline void prl_corrected_unpack4(HVX_Vector b0,HVX_Vector b1,
     *r2=Q6_V_lo_W(b);*r3=Q6_V_hi_W(b);
 }
 
-/* Do not call this helper on uncorrected u8*i8 accumulators. */
+/* raw is one 8 KiB four-plane export of the already corrected accumulator.
+ * transcript_scratch is the same VTCM allocation used by fold_raw_retained:
+ * [band][8 rbi][16 slice][32 int32]. The left half initializes, the right
+ * half XORs; no stale scratch is consumed. The existing flush helper applies.
+ * Byte-plane XOR before unpacking is exact only because no arithmetic follows
+ * the plane loads. Do not call this helper on uncorrected u8*i8 accumulators.
+ */
 static void prl_corrected_fold_raw(int s,int cb,const uint8_t *raw,
                                   uint8_t *transcript_scratch) {
     const HVX_Vector *p0=(const HVX_Vector *)(raw);

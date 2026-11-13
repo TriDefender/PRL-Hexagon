@@ -1,0 +1,61 @@
+== fused skeleton (selftest/fallback path) ==
+In file included from /home/openclaw/PRL-test/prl-npu-miner/build/gen_fused/prl_fused_fused_skel.c:3:
+/home/openclaw/PRL-test/prl-npu-miner/build/gen_fused/fused.h:224:23: warning: redefinition of typedef 'byte' is a C11 feature [-Wtypedef-redefinition]
+  224 | typedef unsigned char byte;
+      |                       ^
+/home/openclaw/PRL-test/npu-bench/hexsdk-dl/6.3.0.0/incs/stddef/AEEStdDef.h:117:29: note: previous definition is here
+  117 | typedef  unsigned char      byte;        /**< byte type */
+      |                             ^
+1 warning generated.
+In file included from /home/openclaw/PRL-test/prl-npu-miner/dsp/fused/fused_impl.c:14:
+/home/openclaw/PRL-test/prl-npu-miner/build/gen_fused/fused.h:224:23: warning: redefinition of typedef 'byte' is a C11 feature [-Wtypedef-redefinition]
+  224 | typedef unsigned char byte;
+      |                       ^
+/home/openclaw/PRL-test/npu-bench/hexsdk-dl/6.3.0.0/incs/stddef/AEEStdDef.h:117:29: note: previous definition is here
+  117 | typedef  unsigned char      byte;        /**< byte type */
+      |                             ^
+1 warning generated.
+== compound skeleton (prl_compound_bytefold_batch) ==
+In file included from /home/openclaw/PRL-test/prl-npu-miner/dsp/compound/impl.c:7:
+/home/openclaw/PRL-test/prl-npu-miner/build/gen/compound.h:224:23: warning: redefinition of typedef 'byte' is a C11 feature [-Wtypedef-redefinition]
+  224 | typedef unsigned char byte;
+      |                       ^
+/home/openclaw/PRL-test/npu-bench/hexsdk-dl/6.3.0.0/incs/stddef/AEEStdDef.h:117:29: note: previous definition is here
+  117 | typedef  unsigned char      byte;        /**< byte type */
+      |                             ^
+In file included from /home/openclaw/PRL-test/prl-npu-miner/dsp/compound/impl.c:10:
+In file included from /home/openclaw/PRL-test/prl-npu-miner/dsp/compound/kernel_api.h:6:
+/home/openclaw/PRL-test/prl-npu-miner/build/kernel_gen/fused.h:224:23: warning: redefinition of typedef 'byte' is a C11 feature [-Wtypedef-redefinition]
+  224 | typedef unsigned char byte;
+      |                       ^
+/home/openclaw/PRL-test/prl-npu-miner/build/gen/compound.h:224:23: note: previous definition is here
+  224 | typedef unsigned char byte;
+      |                       ^
+2 warnings generated.
+In file included from /home/openclaw/PRL-test/prl-npu-miner/build/gen/prl_compound_bytefold_batch_skel.c:3:
+/home/openclaw/PRL-test/prl-npu-miner/build/gen/compound.h:224:23: warning: redefinition of typedef 'byte' is a C11 feature [-Wtypedef-redefinition]
+  224 | typedef unsigned char byte;
+      |                       ^
+/home/openclaw/PRL-test/npu-bench/hexsdk-dl/6.3.0.0/incs/stddef/AEEStdDef.h:117:29: note: previous definition is here
+  117 | typedef  unsigned char      byte;        /**< byte type */
+      |                             ^
+1 warning generated.
+In file included from /home/openclaw/PRL-test/prl-npu-miner/dsp/compound/kernel_impl.c:20:
+/home/openclaw/PRL-test/prl-npu-miner/build/kernel_gen/fused.h:224:23: warning: redefinition of typedef 'byte' is a C11 feature [-Wtypedef-redefinition]
+  224 | typedef unsigned char byte;
+      |                       ^
+/home/openclaw/PRL-test/npu-bench/hexsdk-dl/6.3.0.0/incs/stddef/AEEStdDef.h:117:29: note: previous definition is here
+  117 | typedef  unsigned char      byte;        /**< byte type */
+      |                             ^
+1 warning generated.
+In file included from /home/openclaw/PRL-test/prl-npu-miner/dsp/compound/kernel_impl.c:20:
+/home/openclaw/PRL-test/prl-npu-miner/build/kernel_gen/fused.h:224:23: warning: redefinition of typedef 'byte' is a C11 feature [-Wtypedef-redefinition]
+  224 | typedef unsigned char byte;
+      |                       ^
+/home/openclaw/PRL-test/npu-bench/hexsdk-dl/6.3.0.0/incs/stddef/AEEStdDef.h:117:29: note: previous definition is here
+  117 | typedef  unsigned char      byte;        /**< byte type */
+      |                             ^
+1 warning generated.
+== payload hashes ==
+980dd7806a762de292a38a0a64875305e380e3474415ce600667c346f2af866f  /home/openclaw/PRL-test/prl-npu-miner/payloads/libprl_compound_bytefold_batch_skel.so
+79f91caf0f4f5ed11b0112926e1e7556093e5ab6864540ebe84784e44c21faf3  /home/openclaw/PRL-test/prl-npu-miner/payloads/libprl_fused_fused_skel.so

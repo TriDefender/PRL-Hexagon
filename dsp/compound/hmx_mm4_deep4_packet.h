@@ -1,4 +1,9 @@
-/* The frozen candidate clone will select this helper only when PRL_MM4_DEEP=1 in its local snapshot hmx_mm4.h; mode 0 keeps the unchanged four-pair regular helper. */
+/* Candidate-only helper for one tested u8*i8 deep4 packet.
+ *
+ * This is not yet wired into a compound producer. The frozen candidate clone
+ * will select this helper only when PRL_MM4_DEEP=1 in its local snapshot
+ * hmx_mm4.h; mode 0 keeps the unchanged four-pair regular helper.
+ */
 #ifndef PRL_HMX_MM4_DEEP4_PACKET_H
 #define PRL_HMX_MM4_DEEP4_PACKET_H
 

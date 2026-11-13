@@ -1,4 +1,24 @@
-/* This is NOT one hash of the complete transcript matrix. */
+/* V79 HVX: 32 independent keyed BLAKE3 hashes of exactly one 64-byte block.
+ *
+ * Protocol source: refs/pearl/zk-pow/src/api/proof_utils.rs:1511 serializes
+ * each tile's 16 transcript u32 words little-endian and hashes with key
+ * a_noise_seed. This is NOT one hash of the complete transcript matrix.
+ * Compression follows the vendored official BLAKE3 portable implementation
+ * (miner/src/blake3/blake3_portable.c, Apache-2.0 OR CC0-1.0).
+ *
+ * message_words[s].uw[lane] is transcript word s of tile lane. Compact fold
+ * scratch already has this layout: [16 message words][32 tile lanes].
+ * key_words[8] is one common 32-byte key in little-endian u32 order.
+ * digest_words[w].uw[lane] is output word w in little-endian u32 order.
+ *
+ * The hash parameters are fixed: block_len=64, counter=0,
+ * KEYED_HASH|CHUNK_START|CHUNK_END|ROOT=27. No chunk/parent chaining, XOF
+ * blocks, extra nonce bytes or second hash are performed.
+ *
+ * Input/output vectors must be 128-byte aligned; key_words must be 4-byte
+ * aligned. Buffers must not overlap. The caller owns HVX/VTCM and synchronization.
+ * Compile -mv79 -mhvx -mhvx-length=128B. Production has no scalar lane loop.
+ */
 #ifndef PRL_FUSED_BLAKE3_HVX_H
 #define PRL_FUSED_BLAKE3_HVX_H
 #include <stdint.h>
@@ -13,7 +33,9 @@ static __attribute__((noinline)) void
 prl_blake3_keyed_block64x32(const HVX_Vector *message_words,
                            const uint32_t key_words[8],
                            HVX_Vector digest_words[8]) {
-    /* Holding all 16 message vectors plus 16 state vectors would leave no temporary registers and cause spills in the 32-register HVX vector file. */
+    /* Volatile loads limit message live ranges to two vectors per G. Holding
+     * all 16 message vectors plus 16 state vectors would leave no temporary
+     * registers and cause spills in the 32-register HVX vector file. */
     const volatile HVX_Vector *m=(const volatile HVX_Vector *)message_words;
     HVX_Vector s0=Q6_V_vsplat_R((int32_t)key_words[0]);
     HVX_Vector s1=Q6_V_vsplat_R((int32_t)key_words[1]);

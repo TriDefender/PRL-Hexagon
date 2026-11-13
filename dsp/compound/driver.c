@@ -1,4 +1,6 @@
-/* Independent compound RPC driver: every attempt retains m=2048, its own nonce/commitment/key and packed 4MiB input. */
+/* Independent compound RPC driver: every attempt retains m=2048, its own
+ * nonce/commitment/key and packed 4MiB input. count concatenates complete
+ * attempts in one RPC. Votes end with each RPC; inputs stay immutable during it. */
 #define PRL_HASH_HELPERS_ONLY 1
 #include "fused_hash_driver.c"
 #include "noise_pack_neon.h"
@@ -53,8 +55,8 @@ typedef struct {
     batch_event *events;
     uint64_t limit,consumed;
 } batch_context;
-static int g_expected_deep4_mode=-1;
-static int g_runtime_deep4_mode=-1;
+static int g_expected_bytefold_mode=-1;
+static int g_runtime_bytefold_mode=-1;
 
 static int batch_pin(int cpu) {
     if (cpu<0||cpu>=CPU_SETSIZE) return EINVAL;
@@ -75,7 +77,8 @@ typedef struct {batch_context *context;batch_slot *slot;} batch_noise_job;
 static int batch_noise_attempt(void *argument,unsigned a) {
     batch_noise_job *job=argument;
     batch_context *p=job->context;batch_slot *s=job->slot;
-    /* Each independent call owns local factor/hash scratch and starts its protocol row index at zero. */
+    /* Each independent call owns local factor/hash scratch and starts its
+     * protocol row index at zero. Helpers only write their attempt's 4MiB. */
     return prl_noise_compact_record(s->commit[a].a_noise_seed.b,s->nonce8[a],
         s->x+PRL_COMPACT_BASE_BYTES+(size_t)a*PRL_COMPACT_RECORD_BYTES);
 }
@@ -137,15 +140,16 @@ static int batch_preprocessor_finish(batch_context *p) {
     return rc;
 }
 
-/* Error RPC payloads may be stale; never promote such bytes to PASS. */
+/* Only a successful RPC has a summary whose freshness can be assessed.
+ * Error RPC payloads may be stale; never promote such bytes to PASS. */
 static int batch_summary_ok(const batch_context *p,const uint32_t *d,int mode,int rc,uint64 cycles,int expected_flags) {
     if (rc) {printf("FAIL compound RPC rc=%d payload_freshness_unproven=1\n",rc);return 0;}
-    unsigned deep_mode=0;
+    unsigned tag_mode=0;
     if (!prl_compound_runtime_tag_matches(d[CB_RUNTIME_KERNEL_TAG],
-            g_expected_deep4_mode,&deep_mode)) {
-        printf("FAIL compound runtime_deep4_mode tag=0x%08x expected=%d valid_modes=0,1 "
+            g_expected_bytefold_mode,&tag_mode)) {
+        printf("FAIL compound runtime_bytefold_early tag=0x%08x expected=%d valid_modes=0,1 "
                "fail_fast_no_following_rpc=1\n", d[CB_RUNTIME_KERNEL_TAG],
-               g_expected_deep4_mode);
+               g_expected_bytefold_mode);
         return 0;
     }
     const unsigned chunks=(BATCH_ATTEMPTS+31)/32;
@@ -164,17 +168,18 @@ static int batch_summary_ok(const batch_context *p,const uint32_t *d,int mode,in
             d[0],d[1],d[2],d[3],d[5],d[7],d[6],d[8],d[9],d[10],d[11],d[12],d[13],
             (unsigned long long)cycles);return 0;
     }
-    if (g_runtime_deep4_mode<0) g_runtime_deep4_mode=(int)deep_mode;
-    else if (g_runtime_deep4_mode!=(int)deep_mode) {
-        printf("FAIL compound runtime_deep4_mode changed first=%d current=%u tag=0x%08x "
+    if (g_runtime_bytefold_mode<0) g_runtime_bytefold_mode=(int)tag_mode;
+    else if (g_runtime_bytefold_mode!=(int)tag_mode) {
+        printf("FAIL compound runtime_bytefold_early changed first=%d current=%u tag=0x%08x "
                "fail_fast_no_following_rpc=1\n",
-               g_runtime_deep4_mode,deep_mode,d[CB_RUNTIME_KERNEL_TAG]);
+               g_runtime_bytefold_mode,tag_mode,d[CB_RUNTIME_KERNEL_TAG]);
         return 0;
     }
     return 1;
 }
 
-/* Raising the preparation limit after the timer starts prevents measured batches from being prepared during excluded warmup. */
+/* Raising the preparation limit after the timer starts prevents measured
+ * batches from being prepared during excluded warmup. Each phase drains. */
 static int batch_phase(batch_context *p,int calls,double *elapsed,size_t hits[BATCH_ATTEMPTS],
                     double *acquire_ms) {
     pthread_mutex_lock(&p->mu);
@@ -199,11 +204,12 @@ static int batch_phase(batch_context *p,int calls,double *elapsed,size_t hits[BA
         }
         *acquire_ms+=now_ms()-wait0;
         batch_event *e=p->events+tag;uint64 cycles=0;e->rpc0=now_ms();
-        /* With verify=0, bootstrap the DSP's job-scoped WH cache on the first warmup RPC only. */
+        /* Verification normally initializes the DSP's job-scoped WH cache.
+         * With verify=0, bootstrap it on the first warmup RPC only. */
         const int init_weight_cache = (p->consumed == 0 && tag == 0);
         const int call_flags = p->flags | (init_weight_cache ? 4 : 0);
         const int call_wlen = init_weight_cache ? (int)p->ws : 0;
-        const int rc=prl_compound_deep4_batch_run(BATCH_ATTEMPTS,p->n,call_flags,2,(byte *)s->x,(int)p->xs_rpc,
+        const int rc=prl_compound_bytefold_batch_run(BATCH_ATTEMPTS,p->n,call_flags,2,(byte *)s->x,(int)p->xs_rpc,
             (byte *)p->w,call_wlen,s->params,BATCH_PARAM_WORDS,(int *)s->out,(int)(p->bands_rpc+64),&cycles);
         e->rpc1=now_ms();const uint32_t *diag=s->out+p->bands_rpc;
         if (!batch_summary_ok(p,diag,2,rc,cycles,call_flags)) {
@@ -234,7 +240,8 @@ static double batch_overlap(const batch_event *e,int first,int calls) {
     return total;
 }
 
-/* Full CPU reference work and both RPC modes are outside throughput timing. */
+/* Every selected batch validates all attempts independently under m=2048.
+ * Full CPU reference work and both RPC modes are outside throughput timing. */
 static int batch_verify(batch_context *p,int batches,pr_attempt_mats *am,
                      const int8_t *wj,uint32_t *digest_out,uint32_t *tt_rpc) {
     uint32_t *tt=calloc(p->ttwords_one,4),*cpu_tt=malloc(p->ttwords_rpc*4);
@@ -285,7 +292,7 @@ static int batch_verify(batch_context *p,int batches,pr_attempt_mats *am,
         for (unsigned i=0;i<32u;i++) tt_rpc[-32+(ptrdiff_t)i]=guard;
         for (size_t i=0;i<p->ttwords_rpc+64u;i++) tt_rpc[i]=UINT32_C(0xcdcdcdcd);
         for (unsigned i=0;i<32u;i++) tt_rpc[p->ttwords_rpc+64u+i]=guard;
-        int rc=prl_compound_deep4_batch_run(BATCH_ATTEMPTS,p->n,p->flags|4,0,
+        int rc=prl_compound_bytefold_batch_run(BATCH_ATTEMPTS,p->n,p->flags|4,0,
             (byte *)s->x,(int)p->xs_rpc,(byte *)p->w,(int)p->ws,s->params,
             BATCH_PARAM_WORDS,(int *)tt_rpc,(int)(p->ttwords_rpc+64u),&cycles);
         if (!batch_summary_ok(p,tt_rpc+p->ttwords_rpc,0,rc,cycles,p->flags|4)) {
@@ -307,12 +314,12 @@ static int batch_verify(batch_context *p,int batches,pr_attempt_mats *am,
             result=2;
             goto done;
         }
-        rc=prl_compound_deep4_batch_run(BATCH_ATTEMPTS,p->n,p->flags|4,1,(byte *)s->x,(int)p->xs_rpc,
+        rc=prl_compound_bytefold_batch_run(BATCH_ATTEMPTS,p->n,p->flags|4,1,(byte *)s->x,(int)p->xs_rpc,
             (byte *)p->w,(int)p->ws,s->params,BATCH_PARAM_WORDS,(int *)digest_out,(int)(p->digwords_rpc+64),&cycles);
         if (!batch_summary_ok(p,digest_out+p->digwords_rpc,1,rc,cycles,p->flags|4)||memcmp(digest_out,dig,p->digwords_rpc*4)) {
             printf("FAIL batch all digests batch=%d rc=%d\n",v,rc);result=2;goto done;
         }
-        rc=prl_compound_deep4_batch_run(BATCH_ATTEMPTS,p->n,p->flags,2,(byte *)s->x,(int)p->xs_rpc,
+        rc=prl_compound_bytefold_batch_run(BATCH_ATTEMPTS,p->n,p->flags,2,(byte *)s->x,(int)p->xs_rpc,
             (byte *)p->w,0,s->params,BATCH_PARAM_WORDS,(int *)s->out,(int)(p->bands_rpc+64),&cycles);
         if (!batch_summary_ok(p,s->out+p->bands_rpc,2,rc,cycles,p->flags)||memcmp(s->out,mask,p->bands_rpc*4)) {
             printf("FAIL batch all masks batch=%d rc=%d\n",v,rc);result=2;goto done;
@@ -367,16 +374,15 @@ static int pool_configure(batch_context *p) {
 
 int main(int argc,char **argv) {
     setvbuf(stdout,NULL,_IONBF,0);
-    if (!prl_compound_parse_expected_deep4_mode(getenv("PRL_EXPECT_DEEP4_MODE"),
-                                                &g_expected_deep4_mode)) {
-        printf("REJECT PRL_EXPECT_DEEP4_MODE must be exactly 0 or 1\n");
+    if (!prl_compound_parse_expected_bytefold_mode(getenv("PRL_EXPECT_BYTEFOLD_EARLY"),
+                                                    &g_expected_bytefold_mode)) {
+        printf("REJECT PRL_EXPECT_BYTEFOLD_EARLY must be exactly 0 or 1\n");
         return 2;
     }
-    printf("COMPOUND_DEEP4_EXPECTED_MODE mode=%d source=%s\n",
-           g_expected_deep4_mode,
-           g_expected_deep4_mode<0?"kernel_runtime_tag":"environment");
+    printf("COMPOUND_BYTEFOLD_EXPECTED runtime_deep4_mode=1 runtime_prefetch_order=0 runtime_bytefold_early=%d source=environment\n",
+           g_expected_bytefold_mode);
     batch_context p={.mu=PTHREAD_MUTEX_INITIALIZER,.changed=PTHREAD_COND_INITIALIZER};
-    /* count is attempts, never m. */
+    /* CLI: n, measured compound RPC calls, flags. count is attempts, never m. */
     p.n=argc>1?atoi(argv[1]):1024;
     const int calls=argc>2?atoi(argv[2]):(10000/BATCH_ATTEMPTS);p.flags=(argc>3?atoi(argv[3]):35698)|PRL_COMPACT_FLAG;
     p.parallel=getenv("PRL_HOT_PIPELINE")?atoi(getenv("PRL_HOT_PIPELINE")):1;
@@ -499,8 +505,8 @@ int main(int argc,char **argv) {
     result=batch_phase(&p,warmup,&warmup_ms,hits,&acquire_ms);if (result) goto cleanup;
     printf("BATCH warmup_drained calls=%d distinct_nonces=%d elapsed_ms=%.4f excluded_from_measurement=1\n",warmup,warmup*BATCH_ATTEMPTS,warmup_ms);
     result=batch_phase(&p,calls,&total_ms,hits,&acquire_ms);if (result) goto cleanup;
-    if (g_runtime_deep4_mode<0) {
-        printf("FAIL compound runtime_deep4_mode missing after successful RPCs\n");
+    if (g_runtime_bytefold_mode<0) {
+        printf("FAIL compound runtime_bytefold_early missing after successful RPCs\n");
         result=1;goto cleanup;
     }
     const int first=verify+warmup;double seeds=0,noise=0,rpc=0,core=0,dsp_total=0,consume=0;
@@ -510,8 +516,8 @@ int main(int argc,char **argv) {
     }
     const double attempts=(double)calls*BATCH_ATTEMPTS;
     const double overlap=batch_overlap(p.events,first,calls);
-    printf("MINING_COMPOUND_DEEP4_BATCH_%s runtime_deep4_mode=%d expected_deep4_mode=%d attempts_per_call=%d call_ms=%.4f attempt_ms=%.4f total_ms=%.4f calls=%d distinct_attempts=%d useful_GMAC_s=%.2f seed_ms_per_call=%.4f NEON_noise_pack_ms_per_call=%.4f RPC_ms_per_call=%.4f DSP_core_sum_ms_per_call=%.4f consume_ms_per_call=%.4f input_acquire_ms_per_call=%.4f hits_by_attempt=",
-        verify?"PASSED":"COMPLETED",g_runtime_deep4_mode,g_expected_deep4_mode,BATCH_ATTEMPTS,total_ms/calls,total_ms/attempts,total_ms,calls,calls*BATCH_ATTEMPTS,
+    printf("MINING_COMPOUND_BYTEFOLD_BATCH_%s runtime_deep4_mode=1 runtime_prefetch_order=0 runtime_bytefold_early=%d expected=%d attempts_per_call=%d call_ms=%.4f attempt_ms=%.4f total_ms=%.4f calls=%d distinct_attempts=%d useful_GMAC_s=%.2f seed_ms_per_call=%.4f NEON_noise_pack_ms_per_call=%.4f RPC_ms_per_call=%.4f DSP_core_sum_ms_per_call=%.4f consume_ms_per_call=%.4f input_acquire_ms_per_call=%.4f hits_by_attempt=",
+        verify?"PASSED":"COMPLETED",g_runtime_bytefold_mode,g_expected_bytefold_mode,BATCH_ATTEMPTS,total_ms/calls,total_ms/attempts,total_ms,calls,calls*BATCH_ATTEMPTS,
         (double)BATCH_ATTEMPT_M*p.n*PRL_NOISE_K*attempts/total_ms/1e6,
         seeds/calls,noise/calls,rpc/calls,core/calls,consume/calls,acquire_ms/calls);
     batch_print_hits(hits);printf("\n");
@@ -533,8 +539,8 @@ int main(int argc,char **argv) {
         last_diag[CB_SUM_QUEUE_ACQUIRE_WAIT_PCY],
         last_diag[CB_SUM_TILE_LOOP_PCY],
         last_diag[CB_SUM_CORE_PCYCLES]);
-    printf("BATCH_RUNTIME_DEEP4 sample=last_RPC runtime_deep4_mode=%d expected_deep4_mode=%d tag=0x%08x source=actual_kernel_word63 all_successful_rpcs_consistent=1\n",
-        g_runtime_deep4_mode,g_expected_deep4_mode,last_diag[CB_RUNTIME_KERNEL_TAG]);
+    printf("BATCH_RUNTIME_DEEP_BYTEFOLD sample=last_RPC runtime_deep4_mode=1 runtime_prefetch_order=0 runtime_bytefold_early=%d runtime_bytefold_tag=0x%08x expected=%d source=actual_kernel_word63 all_successful_rpcs_consistent=1\n",
+        g_runtime_bytefold_mode,last_diag[CB_RUNTIME_KERNEL_TAG],g_expected_bytefold_mode);
     printf("BATCH_CLOCK sample=last_RPC_boundary_only tag=%llu policy=%u "
            "pre_Q6_rc=%d pre_Q6_Hz=%u pre_HMX_rc=%d pre_HMX_Hz=%u "
            "post_Q6_rc=%d post_Q6_Hz=%u post_HMX_rc=%d post_HMX_Hz=%u "
@@ -544,7 +550,8 @@ int main(int argc,char **argv) {
         (int32_t)last_diag[CB_PRE_HMX_RC],last_diag[CB_PRE_HMX_HZ],
         (int32_t)last_diag[CB_POST_Q6_RC],last_diag[CB_POST_Q6_HZ],
         (int32_t)last_diag[CB_POST_HMX_RC],last_diag[CB_POST_HMX_HZ]);
-    /* This adds no clocks, formatting, or I/O to the timed loop. */
+    /* Dump only existing event fields after the measured phase has drained.
+     * This adds no clocks, formatting, or I/O to the timed loop. */
     if (dump_events) for (int j=first;j<first+calls;j++) {
         const batch_event *e=p.events+j;
         const uint64_t nonce_first=(p.nonce_start+(uint64_t)j*BATCH_ATTEMPTS)&UINT64_C(0x00ffffffffffffff);

@@ -1,0 +1,13 @@
+{
+  "status": "passed",
+  "mode": 1,
+  "full_driver_clean_exit": 0,
+  "functional_scope": "full32 nonce independent commitment/scalar noise/CPU TT/DSP rawTT/all digests/all masks",
+  "observer": "detached; independent25s watchdog; owned suspend blocker",
+  "watchdog_triggered": false,
+  "wake_release_guard_triggered": false,
+  "original_observer_failure_retained": true,
+  "original_cause": "not separately attributed",
+  "driver_log_sha256": "5707cc1992abcc7b1b345a043ba966542493f5f02fcb26db14d29ca73cf2c939",
+  "performance_data": false
+}

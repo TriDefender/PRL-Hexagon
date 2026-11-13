@@ -1,4 +1,18 @@
-/* qnpu.h — QNN HTP backend for the PRL miner (Snapdragon Hexagon NPU, v79). */
+/* qnpu.h — QNN HTP backend for the PRL miner (Snapdragon Hexagon NPU, v79).
+ *
+ * Same contract as gpu.h / igpu.h: one attempt = patch a 56-bit nonce into A
+ * chunk 0 (host), incrementally update the A Merkle root, rebuild the A-side
+ * rank-128 noise on the host (BLAKE3 PRNG — not expressible as QNN graph ops),
+ * then the NPU runs the sliced int8 GEMM A'·B'ᵀ as S = k/128 batched MatMuls
+ * (qint8 × qint8 → qint32, exact). The host XOR-folds each tile's per-slice
+ * 128 accumulators into the transcript and does the keyed-BLAKE3 jackpot check.
+ * B'ᵀ and its noise are built once per job on the host and uploaded in
+ * slice-transposed layout [S,128,n].
+ *
+ * The QNN runtime libs (libQnnHtp.so, libQnnHtpPrepare.so, libQnnHtpV79Stub.so,
+ * libQnnHtpV79Skel.so) are dlopen'd from the directory in PRL_QNN_DIR (or
+ * alongside the binary); ADSP_LIBRARY_PATH must point at the skel.
+ */
 #ifndef PRL_QNPU_H
 #define PRL_QNPU_H
 
@@ -30,27 +44,37 @@ int pr_qnpu_set_job(pr_qnpu_ctx *ctx, const uint8_t header76[76], char *err, siz
 /* upload the share bound for the current pool job (32 bytes = U256 little-endian) */
 void pr_qnpu_set_bound(pr_qnpu_ctx *ctx, const uint8_t bound_le[32]);
 
-/* coords[i] = t_rows | ((uint64_t)t_cols << 32); digests = 32 bytes per hit. */
+/* one attempt; returns the number of hits (capped at PRL_QNPU_MAXHITS).
+ * coords[i] = t_rows | ((uint64_t)t_cols << 32); digests = 32 bytes per hit.
+ * Serial (blocking) form: used by the selftest for the bit-exact contract. */
 int pr_qnpu_attempt(pr_qnpu_ctx *ctx, uint64_t nonce, uint64_t *coords, uint8_t *digests);
 
 /* Pipelined form (miner loop): queues the attempt for `nonce` on the NPU and
  * returns the PREVIOUS queued attempt's hits; while the NPU executes, the
- * caller can build/submit the returned share. */
+ * caller can build/submit the returned share. While the NPU runs attempt N,
+ * the next call builds attempt N+1's noise — the NPU never idles between
+ * attempts. The commitment/host_a accessors reflect the COMPLETED attempt
+ * (the one whose hits were returned last). */
 int pr_qnpu_attempt_pipe(pr_qnpu_ctx *ctx, uint64_t nonce, uint64_t *coords, uint8_t *digests);
 /* zero-idle form: the caller also passes the NEXT nonce so the backend can
- * pre-build its noise while the NPU executes the current attempt. */
+ * pre-build its noise while the NPU executes the current attempt. next_nonce
+ * is ignored when it equals nonce (one-shot). */
 int pr_qnpu_attempt_pipe2(pr_qnpu_ctx *ctx, uint64_t nonce, uint64_t next_nonce,
                           uint64_t *coords, uint8_t *digests);
-/* The miner should stop instead of retrying a known-failed DSP path for every nonce. */
+/* True after an NPU preparation or RPC failure. The miner should stop instead
+ * of retrying a known-failed DSP path for every nonce. */
 int pr_qnpu_fused_failed(const pr_qnpu_ctx *ctx);
-/* Optional compound path batches independent attempts into one FastRPC call. */
+/* Optional compound path batches independent attempts into one FastRPC call.
+ * Results are read one attempt at a time so each hit retains its own nonce,
+ * A matrix, and commitment for PlainProof construction. */
 int pr_qnpu_compound_available(pr_qnpu_ctx *ctx);
 uint32_t pr_qnpu_compound_attempts(pr_qnpu_ctx *ctx);
 int pr_qnpu_compound_pipe(pr_qnpu_ctx *ctx, uint64_t first_nonce);
 int pr_qnpu_compound_result(pr_qnpu_ctx *ctx, uint32_t attempt,
                             uint64_t *nonce, uint64_t *coords,
                             uint8_t *digests);
-/* Call before a job change so hits are submitted with the old job id, and at loop exit. */
+/* fold+return the last queued attempt's hits. Call before a job change so
+ * hits are submitted with the old job id, and at loop exit. */
 int pr_qnpu_drain(pr_qnpu_ctx *ctx, uint64_t *coords, uint8_t *digests);
 
 /* state needed to build the PlainProof for a hit on the host */

@@ -1,4 +1,19 @@
-/* A complete consensus band (two 32-column halves, each containing 16 retained slices) is assigned to band % workers. */
+/* Independent multi-consumer VTCM transport for exact HMX exports.
+ *
+ * The producer owns HMX. A complete consensus band (two 32-column halves,
+ * each containing 16 retained slices) is assigned to band % workers. Every
+ * worker has 32 raw slots, enough to enqueue a complete band and let the
+ * producer advance to a different worker before blocking on the first one.
+ *
+ * The callback exclusively owns that band's transcript scratch and output.
+ * FIFO order on each worker preserves all left/right-half and slice ordering,
+ * including across row-block boundaries. Scalar metadata is in coherent DSP
+ * memory; raw slots are caller-reserved VTCM. SYNCHT precedes both release
+ * ownership transfers, matching the conservative single-consumer transport.
+ *
+ * The pool object is over-aligned and ~9 KiB; allocate it on the heap using
+ * prl_multi_alloc/free rather than placing it on the FastRPC call stack.
+ */
 #ifndef PRL_FUSED_MULTI_H
 #define PRL_FUSED_MULTI_H
 #include <stdint.h>
@@ -70,7 +85,8 @@ static inline int prl_multi_stopped(prl_multi_worker *w) {
 }
 static int prl_multi_wait(prl_multi_worker *w,uint32_t *word,uint32_t expected) {
 #if PRL_WAIT_FASTPATH
-    /* Like the original while condition, a ready sequence succeeds even if stop is already set. */
+    /* Ready ownership transfers need no deadline. Like the original while
+     * condition, a ready sequence succeeds even if stop is already set. */
     if (__atomic_load_n(word,__ATOMIC_ACQUIRE)==expected) return 0;
 #endif
     unsigned spins=0;
@@ -92,7 +108,8 @@ static int prl_multi_wait(prl_multi_worker *w,uint32_t *word,uint32_t expected) 
 }
 static void prl_multi_worker_main(void *arg) {
     prl_multi_worker *w=(prl_multi_worker *)arg;
-    /* The historical intermittent exit failure was caused by LEGACY joins, not a proven lock failure. */
+    /* Request a virtualized 128-byte HVX context. The historical intermittent
+     * exit failure was caused by LEGACY joins, not a proven lock failure. */
     const int lock=qurt_hvx_lock(QURT_HVX_MODE_128B);
     __atomic_store_n(&w->lock_rc,lock,__ATOMIC_RELEASE);
     if (lock) {
@@ -118,7 +135,9 @@ static void prl_multi_worker_main(void *arg) {
         __atomic_store_n(&slot->seq,i+PRL_MULTI_SLOTS,__ATOMIC_RELEASE);
         __atomic_store_n(&w->processed,i+1u,__ATOMIC_RELEASE);
     }
-    /* Prove that all callback accesses to the caller's RPC output/context are complete before finish is allowed to return; retaining metadata alone cannot retain RPC memory. */
+    /* A failed join may leave this thread alive. Prove that all callback
+     * accesses to the caller's RPC output/context are complete before finish
+     * is allowed to return; retaining metadata alone cannot retain RPC memory. */
     prl_multi_complete();
     __atomic_store_n(&w->quiet,1,__ATOMIC_RELEASE);
     const int unlock=qurt_hvx_unlock();
@@ -140,10 +159,13 @@ static int prl_multi_finish(prl_multi *p,int abort) {
         int status=0;
         const int rc=qurt_thread_join(w->tid,&status);
         w->join_rc=rc;w->join_status=status;
-        /* A failed join still cannot return while a callback could access external RPC memory; this wait must not time out. */
+        /* Successful join already follows quiet and incurs no timer wait.
+         * A failed join still cannot return while a callback could access
+         * external RPC memory; this wait must not time out. */
         while (!__atomic_load_n(&w->quiet,__ATOMIC_ACQUIRE)) qurt_sleep(1);
         if (rc) {
-            /* The caller must not reuse VTCM after such a failure. */
+            /* A failed join does not prove termination; keep the worker stack
+             * allocated. The caller must not reuse VTCM after such a failure. */
             if (!first_error) first_error=AEE_EFAILED;
             continue;
         }

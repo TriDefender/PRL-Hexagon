@@ -1,0 +1,35 @@
+{
+  "independent_method": "raw vertical-bar field split; Decimal cumulative time, first-tag baseline exclusion and integer MAC arithmetic; no frozen parser imported",
+  "all_leg_rates_match": true,
+  "all_attempt_delta_counts_match_MACs": true,
+  "legs": [
+    {
+      "leg": 1,
+      "windows": 20,
+      "gmac_s": 6520.333045746914,
+      "attempt_mac_delta_mismatches": [],
+      "max_display_rounding_gmac_s": "0.00700127790032377474557"
+    },
+    {
+      "leg": 2,
+      "windows": 19,
+      "gmac_s": 7008.308454145081,
+      "attempt_mac_delta_mismatches": [],
+      "max_display_rounding_gmac_s": "0.008012431104960442848115"
+    },
+    {
+      "leg": 3,
+      "windows": 19,
+      "gmac_s": 6972.501047761033,
+      "attempt_mac_delta_mismatches": [],
+      "max_display_rounding_gmac_s": "0.007029631014722013625087"
+    },
+    {
+      "leg": 4,
+      "windows": 20,
+      "gmac_s": 6355.598258341249,
+      "attempt_mac_delta_mismatches": [],
+      "max_display_rounding_gmac_s": "0.006146479594285440030717"
+    }
+  ]
+}

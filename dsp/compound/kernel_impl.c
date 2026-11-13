@@ -1,12 +1,18 @@
-/* flags: 1=stage profiling; 2=retain HMX accumulator across slices (experimental);
+/* Independent, static-HexKL HMX + HVX experiment. No SDKL/skel dependency.
+ * X layout: [row-block64][slice16][kt4][row64][k32], u8=A'+128.
+ * W input: [slice16][k128][column n], signed int8.
+ * flags: 1=stage profiling; 2=retain HMX accumulator across slices (experimental);
  *        4=reload weights; 8=prepare weights only; 16=inline HMX mm;
  *        32=raw byte exports fused with HVX fold (retained mode only);
  *        64=HMX producer/HVX consumer pipeline (requires 32 and 2);
- *        128=corrected HMX state via complement MMs; 256=corrected export bias;
+ *        128=corrected HMX state via complement MMs; 256=corrected export bias.
  *        4096=asynchronous user-DMA double-buffered input (multi only);
  *        8192=pack signed RM input on the DSP (multi only, excludes DMA);
- *        16384=one queue publication/completion per 64-column band (multi only);
+ *        16384=one queue publication/completion per 64-column band (multi only).
  *        32768=adaptive exact signed-24 export (bias+compact+multi only).
+ * 128 and 256 require raw retained mode and are mutually exclusive.
+ * W may have length 0 when cached.
+ * Output: exact transcript, followed by 64 diagnostic int32 words.
  */
 #include <stdint.h>
 #include <stddef.h>
@@ -51,14 +57,29 @@
 #if PRL_PREFETCH_ORDER != 0 && PRL_PREFETCH_ORDER != 1
 #error "PRL_PREFETCH_ORDER must be 0 or 1"
 #endif
+#if PRL_PREFETCH_ORDER != 0
+#error "This full-kernel consumer candidate fixes PF order 0"
+#endif
 #if PRL_MM4_POINTER
 #include "hmx_mm4.h"
+#endif
+#if !defined(PRL_MM4_DEEP) || PRL_MM4_DEEP != 1
+#error "This combined candidate fixes the deep HMX packet at mode 1"
 #endif
 #ifndef PRL_ADAPTIVE_SHARED
 #define PRL_ADAPTIVE_SHARED 0
 #endif
 #if PRL_ADAPTIVE_SHARED
 #include "fused_adaptive_shared.h"
+#endif
+#ifndef PRL_BYTEFOLD_EARLY
+#define PRL_BYTEFOLD_EARLY 0
+#endif
+#if PRL_BYTEFOLD_EARLY != 0 && PRL_BYTEFOLD_EARLY != 1
+#error "PRL_BYTEFOLD_EARLY must be 0 or 1"
+#endif
+#if PRL_BYTEFOLD_EARLY
+#include "fused_bytefold_early.h"
 #endif
 #ifndef PRL_COMPACT_VTCM
 #define PRL_COMPACT_VTCM 0
@@ -67,7 +88,8 @@
 #include "fused_layout_compact.h"
 #endif
 
-/* Profiled calls and every feature combination except the two normal compact pipelines keep the generic path. */
+/* Validated hot-path specialization. Profiled calls and every feature
+ * combination except the two normal compact pipelines keep the generic path. */
 #ifndef PRL_SPECIALIZE_HOT
 #define PRL_SPECIALIZE_HOT 0
 #endif
@@ -122,7 +144,8 @@ static uint32_t g_bias_configs,g_complement,g_constant_activation,g_constant_wei
 static uint32_t g_multi_raw,g_dma_x2,g_dma_descriptors;
 #if PRL_ASYNC_STAGE
 static inline int use_async_stage(int m,int flags) {
-    /* A single row block cannot overlap its first input copy. */
+    /* A single row block cannot overlap its first input copy. Device A/B
+     * showed a regression at m64 and gains at m512/m2048 for n64/n1024. */
     return m>=512&&(flags==2930||flags==35698);
 }
 #endif
@@ -155,7 +178,9 @@ static inline HVX_Vector reduce_columns(HVX_Vector v) {
     return Q6_V_vxor_VV(v, Q6_V_valign_VVR(v, v, 4));
 }
 static __attribute__((noinline)) void store_scratch(uint32_t *tt, int combine) {
-    /* Avoid the long immediate vector-store -> scalar-load RAW stall (V79 HVX PRM 3.9.7). */
+    /* All eight vector results have been written first. Avoid the long immediate
+     * vector-store -> scalar-load RAW stall (V79 HVX PRM 3.9.7). Transcripts stay
+     * in VTCM for a row-block, then leave through one contiguous vector copy. */
     const volatile uint32_t *p=(const volatile uint32_t *)(g_v+g_scratch);
     __asm__ volatile("dcfetch(%0)" :: "r"(p) : "memory");
 #pragma clang loop unroll(disable)
@@ -169,7 +194,8 @@ static __attribute__((noinline)) void store_scratch(uint32_t *tt, int combine) {
 PRL_HOT_INLINE int mm_call(uint32_t act,uint32_t weight,int direct) {
     if (direct) {
         uint8_t *a=g_v+act,*w=g_v+weight;
-        /* All offsets have already been bounds/alignment checked by the caller. */
+        /* Exactly the successful path of micro_mm_u8i8 after entry validation.
+         * All offsets have already been bounds/alignment checked by the caller. */
         __asm__ volatile("{ activation.ub = mxmem(%0,%2):cm\n weight.b = mxmem(%1,%3) }"
                          :: "r"(a),"r"(w),"r"(31),"r"(896):"memory");
         return 0;
@@ -177,7 +203,10 @@ PRL_HOT_INLINE int mm_call(uint32_t act,uint32_t weight,int direct) {
     return hexkl_micro_hmx_mm_u8i8(g_v,act,weight);
 }
 
-/* volatile prevents compiler movement above the external HMX read call. */
+/* acc_read_int32 already returns 64 row-major vectors of 32 int32 words.
+ * Verified offline: SDKL copy_32b_to_submatrix is a scalar strided copy only.
+ * volatile prevents compiler movement above the external HMX read call.
+ */
 static void fold_pair(int s, int nband, int rb, int band, uint32_t *tt) {
     const volatile HVX_Vector *a = (const volatile HVX_Vector *)(g_v+g_res);
     const volatile HVX_Vector *b = a+64;
@@ -205,7 +234,9 @@ static void fold_retained(int s, int nband, int rb, int cb, uint32_t *tt) {
     const volatile HVX_Vector *a=(const volatile HVX_Vector *)(g_v+g_res);
     /* Prefix sum correction; HMX retains the raw cumulative u8*i8 product. */
     const HVX_Vector d=*(HVX_Vector *)(g_v+g_dv+(size_t)(s*g_n+cb*32)*4);
-    /* Extracting individual words here causes costly vector/scalar hand-offs. */
+    /* One vector per (rbi,s), kept entirely in VTCM. The unused retained-mode
+     * cum allocation is exactly large enough: 16 bands * 8 * 16 * 128 = 256KB.
+     * Extracting individual words here causes costly vector/scalar hand-offs. */
     volatile HVX_Vector *scratch=(volatile HVX_Vector *)(g_v+g_cum)+(size_t)(cb/2)*128;
 #pragma clang loop unroll(disable)
     for (int rbi=0;rbi<8;rbi++) {
@@ -254,7 +285,9 @@ static void flush_retained_band(uint32_t *out,int rb,int band,int nband) {
     HVX_Vector *dst=(HVX_Vector *)(out+((size_t)rb*nband+band)*512);
 #pragma clang loop unroll(disable)
     for (int rbi=0;rbi<8;rbi++,p+=16,dst+=2) {
-        /* Every shuffle follows the little-endian vshuff pattern from HVX PRM; unused columns are dropped at the first two stages and the final 64-byte interleave. */
+        /* 16 slice rows -> four transcript columns. Every shuffle follows the
+         * little-endian vshuff pattern from HVX PRM; unused columns are dropped
+         * at the first two stages and the final 64-byte interleave. */
         HVX_Vector a0=shuffle_lo(p[0],p[1],4),a1=shuffle_lo(p[2],p[3],4);
         HVX_Vector a2=shuffle_lo(p[4],p[5],4),a3=shuffle_lo(p[6],p[7],4);
         HVX_Vector a4=shuffle_lo(p[8],p[9],4),a5=shuffle_lo(p[10],p[11],4);
@@ -284,9 +317,13 @@ static void init_fold_context(prl_fold_context *c,uint32_t *out,int nband,int fl
 static void pipeline_consume(void *context,int rb,int cb,int s,const uint8_t *raw) {
     prl_fold_context *c=(prl_fold_context *)context;
 #if PRL_ADAPTIVE_SHARED
-    if (c->flags&32768)
+    if (c->flags&32768) {
+#if PRL_BYTEFOLD_EARLY
+        prl_bytefold_early_fold_raw(s,cb,raw,g_v+g_cum,g_adaptive_short[s*(g_n/32)+cb]);
+#else
         prl_compact_fold_adaptive_shared(s,cb,raw,g_v+g_cum,g_adaptive_short[s*(g_n/32)+cb]);
-    else
+#endif
+    } else
 #endif
     if ((c->flags&32768) && g_adaptive_short[s*(g_n/32)+cb])
         prl_compact_fold_raw24(s,cb,raw,g_v+g_cum);
@@ -306,7 +343,9 @@ PRL_HOT_INLINE void read_corrected_snapshot(int flags,int s,int cb,uint32_t raw)
     else prl_hmx_read_corrected_bytes_raw(g_v,cfg,raw);
 }
 #if PRL_SPECIALIZE_HOT
-/* Keep the compact feature choice in the callback's code; hash output mode is a job option and must remain dynamic for both run() and run_hash(). */
+/* Thread callbacks cannot inherit constants stored in their context. Keep the
+ * compact feature choice in the callback's code; hash output mode is a job
+ * option and must remain dynamic for both run() and run_hash(). */
 static __attribute__((noinline)) void pipeline_flush_compact(prl_fold_context *c,int rb,int cb) {
     if (c->hash.output_mode)
         prl_hash_flush_compact(&c->hash,c->tt,rb,cb/2,c->nband,g_v+g_cum);
@@ -316,15 +355,20 @@ PRL_HOT_INLINE void pipeline_consume_compact(void *context,int rb,int cb,int s,
                                             const uint8_t *raw,int adaptive) {
     prl_fold_context *c=(prl_fold_context *)context;
 #if PRL_ADAPTIVE_SHARED
-    if (adaptive)
+    if (adaptive) {
+#if PRL_BYTEFOLD_EARLY
+        prl_bytefold_early_fold_raw(s,cb,raw,g_v+g_cum,g_adaptive_short[s*(g_n/32)+cb]);
+#else
         prl_compact_fold_adaptive_shared(s,cb,raw,g_v+g_cum,g_adaptive_short[s*(g_n/32)+cb]);
-    else prl_compact_fold_raw(s,cb,raw,g_v+g_cum);
+#endif
+    } else prl_compact_fold_raw(s,cb,raw,g_v+g_cum);
 #else
     if (adaptive && g_adaptive_short[s*(g_n/32)+cb])
         prl_compact_fold_raw24(s,cb,raw,g_v+g_cum);
     else prl_compact_fold_raw(s,cb,raw,g_v+g_cum);
 #endif
-    /* Keeping its transpose/hash out of the per-snapshot function avoids long vector lifetimes and stack spills. */
+    /* Only one callback in 32 flushes a band. Keeping its transpose/hash out of
+     * the per-snapshot function avoids long vector lifetimes and stack spills. */
     if ((cb&1) && s==15) pipeline_flush_compact(c,rb,cb);
 }
 static void pipeline_consume_2930(void *context,int rb,int cb,int s,const uint8_t *raw) {
@@ -338,7 +382,9 @@ static int run_pipeline(int m,int n,int flags,const byte *X,uint32_t *tt,
                         uint32_t *dg,uint64_t *stage,uint64_t *mm,uint64_t *read,
                         uint64_t *fold,uint64_t *wait,const prl_hash_options *hash) {
     const int profile=(flags&1)||PRL_DIAGNOSTIC_PROFILE,direct=flags&16,ncb=n/32;
-    /* A join error leaves ownership unresolved, so retain the heap block and prohibit further calls from reusing any VTCM until this PD is reconstructed. */
+    /* Keep callback context and transport alive until successful join. A join
+     * error leaves ownership unresolved, so retain the heap block and prohibit
+     * further calls from reusing any VTCM until this PD is reconstructed. */
     void *allocation=malloc(sizeof(prl_pipe)+sizeof(prl_fold_context)+63u);
     if (!allocation) return AEE_ENOMEMORY;
     prl_pipe *pipe=(prl_pipe *)(((uintptr_t)allocation+63u)&~(uintptr_t)63u);
@@ -520,7 +566,8 @@ PRL_MULTI_IMPLEMENTATION int PRL_MULTI_NAME(int m,int n,int flags,const byte *X,
             prl_multi_worker *known_worker=NULL;
             if (known_queue) {
 #if PRL_GROUP_WORKERS == 4
-                /* Avoid a runtime modulo helper in the row-block/column-block loop. */
+                /* The exact hot service is built with four workers. Avoid a
+                 * runtime modulo helper in the row-block/column-block loop. */
                 known_worker=&pool->worker[((unsigned)cb>>1)&3u];
 #else
                 known_worker=&pool->worker[((unsigned)cb>>1)%pool->workers];
@@ -833,7 +880,8 @@ static int fused_run_core(int m,int n,int flags,const byte *X,int XLen,
     if (rc) return rc;
     const uint64_t all0=HAP_perf_get_pcycles();
     const uint64_t all_ticks0=HAP_perf_get_qtimer_count();
-    /* Never combine stale WH with new correction vectors when a caller forgets the explicit reload flag. */
+    /* A nonempty W always starts a new job. Never combine stale WH with new
+     * correction vectors when a caller forgets the explicit reload flag. */
     const int reload=WkLen||(flags&4)||g_n!=n;
     /* Once reload is captured, compact input must use the staged hot path
      * even for the first call carrying the reload bit. */
@@ -844,7 +892,8 @@ static int fused_run_core(int m,int n,int flags,const byte *X,int XLen,
     if (multi_workers>(unsigned)n/64u) multi_workers=(unsigned)n/64u;
     uint32_t need;
 #if PRL_COMPACT_VTCM
-    /* The selected offsets depend only on n, never on a call's feature bits. */
+    /* Policy 2 preserves every legacy-capable complement mode through n1600.
+     * The selected offsets depend only on n, never on a call's feature bits. */
     const int compact_layout=PRL_COMPACT_VTCM==1 ||
         (PRL_COMPACT_VTCM==2&&n>=1664);
     if (compact_layout) {
@@ -881,7 +930,8 @@ static int fused_run_core(int m,int n,int flags,const byte *X,int XLen,
     g_constant_activation=align2048(g_complement+wh_size);
     g_constant_weight=g_constant_activation+2048u;
     g_multi_raw=align2048(g_constant_weight+2048u);
-    /* Enabling DMA never relocates a cache. */
+    /* Extra input/descriptor storage has a fixed location outside every raw
+     * ring and all lazy weight caches. Enabling DMA never relocates a cache. */
     g_dma_x2=align2048(g_multi_raw+PRL_MULTI_RAW_BYTES(PRL_MULTI_MAX_WORKERS));
     g_dma_descriptors=g_dma_x2+PRL_DMA_BLOCK_BYTES;
     need=
@@ -917,7 +967,8 @@ static int fused_run_core(int m,int n,int flags,const byte *X,int XLen,
             }
         }
     }
-    /* Kept in every non-empty-W call so switching mode uses the right correction. */
+    /* Compute both forms for the selected mode; this is job preparation, not core time.
+     * Kept in every non-empty-W call so switching mode uses the right correction. */
     if (WkLen) {
         if ((size_t)WkLen<(size_t)16*n*128) return AEE_EBADSIZE;
         int32_t *dv=(int32_t *)(g_v+g_dv);
@@ -940,7 +991,8 @@ static int fused_run_core(int m,int n,int flags,const byte *X,int XLen,
         g_n=n; /* publish the cache only after both WH and correction are ready */
         g_retained=flags&2;
     } else if (reload || g_retained!=(flags&2)) return AEE_EBADSIZE;
-    /* This supports empty-W mode switches without mixing old and new weights. */
+    /* Auxiliary caches are lazy and derive only from the complete cached job.
+     * This supports empty-W mode switches without mixing old and new weights. */
     if ((flags&256) && !g_bias_ready) {
         const int ncb=n/32;
         int32_t *neg=(int32_t *)(g_v+g_scratch);
@@ -1075,14 +1127,16 @@ static int fused_run_core(int m,int n,int flags,const byte *X,int XLen,
     return 0;
 }
 
-/* Only the inclusive RPC interval includes voting overhead. */
+/* Power APIs wrap the complete core call, outside both its core and total
+ * diagnostic timers. Only the inclusive RPC interval includes voting overhead. */
 static inline __attribute__((always_inline))
 int run_core_with_clock(int m,int n,int flags,const byte *X,int XLen,
                        const byte *Wk,int WkLen,uint32_t *tt,uint32_t *dg,
                        const prl_hash_options *hash,uint64 *cycles) {
 #if PRL_HMX_CLOCK_POLICY
     unsigned expected=0;
-    /* A busy RPC must not mutate the active vote or another caller's output. */
+    /* Guard initialize/cache preparation as well as the voted measured call.
+     * A busy RPC must not mutate the active vote or another caller's output. */
     if (!__atomic_compare_exchange_n(&g_clock_call_active,&expected,1u,0,
                                      __ATOMIC_ACQ_REL,__ATOMIC_RELAXED))
         return AEE_EBADSTATE;
@@ -1101,7 +1155,8 @@ int run_core_with_clock(int m,int n,int flags,const byte *X,int XLen,
     }
     rc=prl_hmx_vote_begin(&g_clock_vote,PRL_HMX_CLOCK_POLICY);
     if (!rc) rc=fused_run_core(m,n,flags,X,XLen,Wk,WkLen,tt,dg,hash,cycles);
-    /* Core finish proves source_done/quiet before returning; retain its poison state. */
+    /* Core errors include partial HMX exports and failed joins. Core finish
+     * proves source_done/quiet before returning; retain its poison state. */
     prl_multi_complete();
     {
         const int end_rc=prl_hmx_vote_end(&g_clock_vote);
@@ -1132,7 +1187,8 @@ int prl_fused_fused_run(int m,int n,int flags,const byte *X,int XLen,
                            (uint32_t *)out+words,NULL,cycles);
 }
 
-/* Fixed params are copied by QAIC into scalar metadata. */
+/* Optional per-tile final-hash method. Fixed params are copied by QAIC into
+ * scalar metadata. A 64-word diagnostic tail follows this mode's results. */
 int prl_fused_fused_run_hash(int m,int n,int flags,int output_mode,
                              const byte *X,int XLen,const byte *Wk,int WkLen,
                              const prl_fused_fused_HashParams *params,
@@ -1174,5 +1230,5 @@ __attribute__((visibility("hidden")))
 int prl_compound_kernel_poisoned(void) {return g_pipeline_poisoned;}
 __attribute__((visibility("hidden")))
 uint32_t prl_compound_kernel_runtime_tag(void) {
-    return PRL_COMPOUND_RUNTIME_TAG_MAGIC|(uint32_t)PRL_MM4_DEEP;
+    return PRL_COMPOUND_RUNTIME_TAG_MAGIC|(uint32_t)PRL_BYTEFOLD_EARLY;
 }

@@ -1,4 +1,8 @@
-/* Each memory operation observes the packet's OLD pointer. */
+/* Four original K32 HMX MMs in four packets, with pointer increments in the
+ * spare ALU slots. Each memory operation observes the packet's OLD pointer.
+ * Early clobber prevents the mutated pointers aliasing the two input constants.
+ * Caller validated all VTCM ranges; accumulator state and MM order are unchanged.
+ */
 #ifndef PRL_HMX_MM4_H
 #define PRL_HMX_MM4_H
 #include <stdint.h>

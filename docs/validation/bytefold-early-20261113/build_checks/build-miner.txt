@@ -1,0 +1,3 @@
+9a8d368cad43d0dcfceeb369939f27cda69c5b1bb3d3b64c45ad8c18d4522eaa  /home/openclaw/PRL-test/prl-npu-miner/payloads/libprlminer.so
+b74972f9d2443c0c139730f84272e76d6cabc12877079bfbe3d68361e20cb298  /home/openclaw/PRL-test/prl-npu-miner/payloads/app-check
+7c66f5a4430c81dd9ab158f305b7701e6326e1660e8e5e7ddc53e1db31f3cb76  /home/openclaw/PRL-test/prl-npu-miner/payloads/bytefold-batch32-driver

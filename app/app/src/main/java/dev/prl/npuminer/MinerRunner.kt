@@ -23,7 +23,7 @@ data class MinerUiState(
 )
 
 /**
- * Run the bundled deep4 compound miner as a plain app-uid child process.
+ * Run the bundled early byte-fold compound miner as a plain app-uid child process.
  */
 class MinerRunner(ctx: Context) {
 
@@ -71,12 +71,10 @@ class MinerRunner(ctx: Context) {
     }
 
     private fun envExports(): String = buildString {
-        // libcdsprpc treats ADSP_LIBRARY_PATH as a single directory (it does
-        // not split on ':').
+        // FastRPC uses semicolon-separated DSP library directories.
         append("export ADSP_LIBRARY_PATH='$nativeDir'\n")
-        // Pin the experimental deep1 kernel: every compound RPC must report
-        // the 0x44454501 runtime tag, otherwise the miner takes its fatal path.
-        append("export PRL_EXPECT_DEEP4_MODE=1\n")
+        // Pin early byte-fold: every compound RPC must report 0x42464501.
+        append("export PRL_EXPECT_BYTEFOLD_EARLY=1\n")
         // /system/lib64 must precede /vendor/lib64: vendor libbinder.so lacks
         // symbols that system libbinder_ndk expects, and the exec'd child gets
         // the plain linker namespace.
@@ -287,7 +285,7 @@ class MinerRunner(ctx: Context) {
         const val LOG_CAP = 14
         const val MINER = "libprlminer.so"
         const val FUSED_SKEL = "libprl_fused_fused_skel.so"
-        const val COMPOUND_SKEL = "libprl_compound_deep4_batch_skel.so"
+        const val COMPOUND_SKEL = "libprl_compound_bytefold_batch_skel.so"
         const val GOLDEN = "golden.txt"
     }
 }

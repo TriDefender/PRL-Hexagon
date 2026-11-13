@@ -1,7 +1,7 @@
 /*
  * pearl.c — pearlhash core: blake3 wrappers, V3 commitment chain, rank-128
- * noise, tile transcripts, difficulty bound, matching the official zk-pow /
- * pearl-blake3 crates bit-for-bit.
+ * noise, tile transcripts, difficulty bound. Matches the official zk-pow /
+ * pearl-blake3 crates bit-for-bit (validated by tests/selftest).
  */
 #include "pearl.h"
 
@@ -111,7 +111,8 @@ void pr_root_cv(const uint8_t key[32], const uint8_t left[32], const uint8_t rig
 /*
  * Root of the pearl_blake3 tree: bottom-up pairing of chunk CVs carrying the
  * odd node up (verified equal to the keyed blake3 of the whole buffer, see
- * tests/selftest).
+ * tests/selftest). `fast` uses the official SIMD hasher, which builds the same
+ * tree; the manual path exists to prove that equality in the selftest.
  */
 void pr_matrix_root(const uint8_t key[32], const uint8_t *data, size_t len, uint8_t root[32]) {
     if (len == 0) { memset(root, 0, 32); return; }

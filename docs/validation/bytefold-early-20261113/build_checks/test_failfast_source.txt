@@ -1,0 +1,1 @@
+FAILFAST_SOURCE_PASSED production_worker=1 compound_failure_break_before_results_and_fused=1 drain_unconditional=1 drain_no_rpc=1 fatal_pool_exit=2

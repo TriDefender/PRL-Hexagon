@@ -1,0 +1,68 @@
+{
+  "baseline_path": "prldsp/experiments/compound_deep4_prefetch_20261112/out/dsp/order0/kernel.o",
+  "candidate_path": "prldsp/experiments/compound_bytefold_early_20261113/out/dsp/mode0/kernel.o",
+  "baseline_object_sha256": "3fddc0b5056676e5fea171cc1d88bdbda6bb11074524739b8ddd88652451bd52",
+  "candidate_object_sha256": "d88089003c5254664f90c513957f33e6092666a434963385fc443280ae7d3f02",
+  "comparison": "exact ELF body bytes plus relative relocation symbol/type/addend",
+  "same_functions": [
+    "band_consume",
+    "flush_retained_band",
+    "fold_pair",
+    "fold_raw_retained",
+    "fold_retained",
+    "fused_run_core",
+    "initialize",
+    "pipeline_consume",
+    "pipeline_consume_2930",
+    "pipeline_consume_35698",
+    "pipeline_flush_compact",
+    "prl_band_worker_main",
+    "prl_blake3_keyed_block64x32",
+    "prl_compact_flush_band",
+    "prl_compact_fold_raw",
+    "prl_compound_kernel_initialize",
+    "prl_compound_kernel_poisoned",
+    "prl_compound_kernel_run",
+    "prl_compound_kernel_run_hash",
+    "prl_corrected_fold_raw",
+    "prl_corrected_prepare",
+    "prl_corrected_slice",
+    "prl_dma_submit",
+    "prl_grouped_start",
+    "prl_grouped_worker_main",
+    "prl_layout_compact_init",
+    "prl_layout_compact_need",
+    "prl_multi_worker_main",
+    "prl_pack_signed_rm_block",
+    "prl_pipe_worker",
+    "prl_stage_main",
+    "prl_stage_start_mode",
+    "run_band_pipeline",
+    "run_multi_pipeline",
+    "run_multi_pipeline_2930",
+    "run_multi_pipeline_35698",
+    "run_pipeline",
+    "store_scratch"
+  ],
+  "changed_functions": {
+    "prl_compound_kernel_runtime_tag": {
+      "baseline": {
+        "address": 864,
+        "size": 8,
+        "section": 2,
+        "body_sha256": "f2fa613f0f73305f81e30a57f0152ab7fd60f8df16b95c88664f5e75613047b6",
+        "relocations": []
+      },
+      "candidate": {
+        "address": 864,
+        "size": 8,
+        "section": 2,
+        "body_sha256": "6d0753bff5c88b0d9a9ff5ef67b40ca90a55ac0b3b4540a90a407779911af94d",
+        "relocations": []
+      }
+    }
+  },
+  "removed_functions": [],
+  "added_functions": [],
+  "limitations": "Object comparison only; no timing or protocol correctness conclusion."
+}

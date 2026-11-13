@@ -1,0 +1,612 @@
+{
+  "status": "all4_legs_eligible",
+  "parser_source": "prldsp/experiments/compound_prep_workers_20261112/pool_recordonly_20261112/summarize_pool_log.py",
+  "parser_sha256": "c909262da87d79decffca470eaf4368c8af32354d5608a12c0c8619f4ac080de",
+  "schema_translation": "frozen TAG_RE order capture rebound to BFE mode; PF0 verified in exact runtime text; normalized state fixed deep1/PF0; output labels renamed",
+  "legs": [
+    {
+      "leg": 1,
+      "mode": 1,
+      "state": {
+        "status": "complete_bounded",
+        "mode": "1",
+        "expected_tag": "0x42464501",
+        "prep_workers": "4",
+        "start_uptime_cs": "8551016",
+        "stop_uptime_cs": "8554028",
+        "end_uptime_cs": "8554071",
+        "stop_reason": "duration_elapsed",
+        "child_exit_code": "143",
+        "affinity_complete": "1"
+      },
+      "summary": {
+        "prep_workers_expected": 4,
+        "prep_workers_seen": [
+          4
+        ],
+        "prep_workers_match": true,
+        "deep4_mode": 1,
+        "expected_runtime_tag": "0x42464501",
+        "runtime_tag_status": "match",
+        "runtime_tag_lines": 1,
+        "first_post_runtime_tag_stats_line": 10,
+        "runtime_rows_seen": 1,
+        "runtime_rows_without_tag": 0,
+        "npu_start_seen": true,
+        "npu_start_line": 3,
+        "run_status": "complete_bounded",
+        "bounded_healthy_leg": true,
+        "stats_rows": 30,
+        "stats_integrity": true,
+        "malformed_stats_lines": [],
+        "elapsed_lower_bound_seconds": "30.002520",
+        "elapsed_lower_bound_definition": "sum of reported sample_elapsed_s from stats-thread start; omits log/reset overhead and is a conservative lower bound, not absolute launch time",
+        "window_policy": "exclude the first stats row after the first runtime tag because its interval may start pre-tag; also accept only complete 1.0-1.1 s rows with delta>0 whose interval-start cumulative reported-dt lower bound is >=10 s",
+        "first_post_runtime_tag_baseline_excluded": true,
+        "first_10s_excluded_by_lower_bound": true,
+        "affinity_evidence": {
+          "rows": 9,
+          "singleton_allowed_cpus_seen": [
+            "3",
+            "4",
+            "5",
+            "6",
+            "7"
+          ],
+          "required_singleton_masks": [
+            "3",
+            "4",
+            "5",
+            "6",
+            "7"
+          ],
+          "masks_present": true,
+          "role_attribution": "not inferred from CPU masks"
+        },
+        "leg_eligible": true,
+        "accepted_windows": 20,
+        "diagnostic_candidate_windows": 20,
+        "accepted_sum_delta_macs": 141562122076160,
+        "accepted_sum_dt_seconds": "20.001634",
+        "accepted_aggregate_gmac_s": "7077.527869781038889122758671",
+        "accepted_median_gmac_s": "7009.004638227314132822228845",
+        "accepted_mad_gmac_s": "137.4467857057171056449243535",
+        "accepted_min_gmac_s": "6733.929602182212329739642391",
+        "accepted_max_gmac_s": "7283.747387951455446663286907",
+        "final_attempts": 50688,
+        "final_accepted": 0,
+        "final_rejected": 0,
+        "share_status": "share_unverified",
+        "hmx_q6_boundary": {
+          "records": 24,
+          "first_batch": 32,
+          "first_hmx_mhz": [
+            1209,
+            1209
+          ],
+          "first_q6_mhz": [
+            2112,
+            2112
+          ],
+          "last_batch": 32,
+          "last_hmx_mhz": [
+            979,
+            806
+          ],
+          "last_q6_mhz": [
+            2112,
+            1708
+          ]
+        },
+        "hmx_q6_record_count_all": 24,
+        "expected_bytefold_mode": 1,
+        "fixed_prefetch_order": 0
+      },
+      "thermal": {
+        "samples": 82,
+        "median_interval_s": 0.36,
+        "first_npu_max_millic": 38600,
+        "max_npu_millic": 105800,
+        "max_socd_percent": 67,
+        "post10_npu_min_millic": 96100,
+        "post10_npu_max_millic": 105800
+      },
+      "battery_before": {
+        "charging": false,
+        "level": "33",
+        "temperature_raw": "362"
+      },
+      "battery_after": {
+        "charging": false,
+        "level": "33",
+        "temperature_raw": "352"
+      },
+      "zero_delta_post10_windows": 0,
+      "inclusive_zero_rate_gmac_s": 7077.527869781039,
+      "frequency_models": {
+        "Q6": {
+          "harmonic_boundary_mhz": 1948.2748493353606,
+          "reference_reported_mhz": 2112,
+          "boundary_samples": 30,
+          "min_mhz": 1593,
+          "max_mhz": 2112,
+          "modeled_dt_s": 18.451079766955978
+        },
+        "HMX": {
+          "harmonic_boundary_mhz": 884.4113495065716,
+          "reference_reported_mhz": 1209,
+          "boundary_samples": 30,
+          "min_mhz": 672,
+          "max_mhz": 1209,
+          "modeled_dt_s": 14.63165601180854
+        }
+      },
+      "frequency_model_batch_records": 15,
+      "job_records": 1,
+      "miner_log_sha256": "8e3aaca14f952d3ec83dd931b4d5f226a4a679c133803c778b6c7f87715c4473"
+    },
+    {
+      "leg": 2,
+      "mode": 0,
+      "state": {
+        "status": "complete_bounded",
+        "mode": "0",
+        "expected_tag": "0x42464500",
+        "prep_workers": "4",
+        "start_uptime_cs": "8554080",
+        "stop_uptime_cs": "8557088",
+        "end_uptime_cs": "8557149",
+        "stop_reason": "duration_elapsed",
+        "child_exit_code": "143",
+        "affinity_complete": "1"
+      },
+      "summary": {
+        "prep_workers_expected": 4,
+        "prep_workers_seen": [
+          4
+        ],
+        "prep_workers_match": true,
+        "deep4_mode": 1,
+        "expected_runtime_tag": "0x42464500",
+        "runtime_tag_status": "match",
+        "runtime_tag_lines": 1,
+        "first_post_runtime_tag_stats_line": 10,
+        "runtime_rows_seen": 1,
+        "runtime_rows_without_tag": 0,
+        "npu_start_seen": true,
+        "npu_start_line": 3,
+        "run_status": "complete_bounded",
+        "bounded_healthy_leg": true,
+        "stats_rows": 30,
+        "stats_integrity": true,
+        "malformed_stats_lines": [],
+        "elapsed_lower_bound_seconds": "30.007024",
+        "elapsed_lower_bound_definition": "sum of reported sample_elapsed_s from stats-thread start; omits log/reset overhead and is a conservative lower bound, not absolute launch time",
+        "window_policy": "exclude the first stats row after the first runtime tag because its interval may start pre-tag; also accept only complete 1.0-1.1 s rows with delta>0 whose interval-start cumulative reported-dt lower bound is >=10 s",
+        "first_post_runtime_tag_baseline_excluded": true,
+        "first_10s_excluded_by_lower_bound": true,
+        "affinity_evidence": {
+          "rows": 13,
+          "singleton_allowed_cpus_seen": [
+            "3",
+            "4",
+            "5",
+            "6",
+            "7"
+          ],
+          "required_singleton_masks": [
+            "3",
+            "4",
+            "5",
+            "6",
+            "7"
+          ],
+          "masks_present": true,
+          "role_attribution": "not inferred from CPU masks"
+        },
+        "leg_eligible": true,
+        "accepted_windows": 20,
+        "diagnostic_candidate_windows": 20,
+        "accepted_sum_delta_macs": 124657130799104,
+        "accepted_sum_dt_seconds": "20.005552",
+        "accepted_aggregate_gmac_s": "6231.126779161304821781473463",
+        "accepted_median_gmac_s": "6184.258165642402478982768515",
+        "accepted_mad_gmac_s": "1.177756936753319954651191",
+        "accepted_min_gmac_s": "6046.878577510419249814013391",
+        "accepted_max_gmac_s": "6321.749337258391912566120372",
+        "final_attempts": 43392,
+        "final_accepted": 0,
+        "final_rejected": 0,
+        "share_status": "share_unverified",
+        "hmx_q6_boundary": {
+          "records": 21,
+          "first_batch": 32,
+          "first_hmx_mhz": [
+            1209,
+            1075
+          ],
+          "first_q6_mhz": [
+            2112,
+            1708
+          ],
+          "last_batch": 32,
+          "last_hmx_mhz": [
+            979,
+            979
+          ],
+          "last_q6_mhz": [
+            2112,
+            1939
+          ]
+        },
+        "hmx_q6_record_count_all": 21,
+        "expected_bytefold_mode": 0,
+        "fixed_prefetch_order": 0
+      },
+      "thermal": {
+        "samples": 89,
+        "median_interval_s": 0.34,
+        "first_npu_max_millic": 79500,
+        "max_npu_millic": 106200,
+        "max_socd_percent": 67,
+        "post10_npu_min_millic": 91100,
+        "post10_npu_max_millic": 106200
+      },
+      "battery_before": {
+        "charging": false,
+        "level": "33",
+        "temperature_raw": "352"
+      },
+      "battery_after": {
+        "charging": false,
+        "level": "33",
+        "temperature_raw": "350"
+      },
+      "zero_delta_post10_windows": 0,
+      "inclusive_zero_rate_gmac_s": 6231.1267791613045,
+      "frequency_models": {
+        "Q6": {
+          "harmonic_boundary_mhz": 1821.7280966143721,
+          "reference_reported_mhz": 2112,
+          "boundary_samples": 28,
+          "min_mhz": 1382,
+          "max_mhz": 2112,
+          "modeled_dt_s": 17.256001972859778
+        },
+        "HMX": {
+          "harmonic_boundary_mhz": 918.1069660266219,
+          "reference_reported_mhz": 1209,
+          "boundary_samples": 28,
+          "min_mhz": 672,
+          "max_mhz": 1209,
+          "modeled_dt_s": 15.192089867996543
+        }
+      },
+      "frequency_model_batch_records": 14,
+      "job_records": 1,
+      "miner_log_sha256": "01f8c6d60b4bafa87ac584dba811f80cc0269c937928a6f1c87896218ac42352"
+    },
+    {
+      "leg": 3,
+      "mode": 0,
+      "state": {
+        "status": "complete_bounded",
+        "mode": "0",
+        "expected_tag": "0x42464500",
+        "prep_workers": "4",
+        "start_uptime_cs": "8557158",
+        "stop_uptime_cs": "8560186",
+        "end_uptime_cs": "8560237",
+        "stop_reason": "duration_elapsed",
+        "child_exit_code": "143",
+        "affinity_complete": "1"
+      },
+      "summary": {
+        "prep_workers_expected": 4,
+        "prep_workers_seen": [
+          4
+        ],
+        "prep_workers_match": true,
+        "deep4_mode": 1,
+        "expected_runtime_tag": "0x42464500",
+        "runtime_tag_status": "match",
+        "runtime_tag_lines": 1,
+        "first_post_runtime_tag_stats_line": 10,
+        "runtime_rows_seen": 1,
+        "runtime_rows_without_tag": 0,
+        "npu_start_seen": true,
+        "npu_start_line": 3,
+        "run_status": "complete_bounded",
+        "bounded_healthy_leg": true,
+        "stats_rows": 30,
+        "stats_integrity": true,
+        "malformed_stats_lines": [],
+        "elapsed_lower_bound_seconds": "30.002951",
+        "elapsed_lower_bound_definition": "sum of reported sample_elapsed_s from stats-thread start; omits log/reset overhead and is a conservative lower bound, not absolute launch time",
+        "window_policy": "exclude the first stats row after the first runtime tag because its interval may start pre-tag; also accept only complete 1.0-1.1 s rows with delta>0 whose interval-start cumulative reported-dt lower bound is >=10 s",
+        "first_post_runtime_tag_baseline_excluded": true,
+        "first_10s_excluded_by_lower_bound": true,
+        "affinity_evidence": {
+          "rows": 13,
+          "singleton_allowed_cpus_seen": [
+            "3",
+            "4",
+            "5",
+            "6",
+            "7"
+          ],
+          "required_singleton_masks": [
+            "3",
+            "4",
+            "5",
+            "6",
+            "7"
+          ],
+          "masks_present": true,
+          "role_attribution": "not inferred from CPU masks"
+        },
+        "leg_eligible": true,
+        "accepted_windows": 20,
+        "diagnostic_candidate_windows": 20,
+        "accepted_sum_delta_macs": 125756642426880,
+        "accepted_sum_dt_seconds": "20.002065",
+        "accepted_aggregate_gmac_s": "6287.182969702378229447809514",
+        "accepted_median_gmac_s": "6321.641876893994590238229475",
+        "accepted_mad_gmac_s": "0.101139063872401205378029",
+        "accepted_min_gmac_s": "6182.267634650870350119252061",
+        "accepted_max_gmac_s": "6321.755658571558562459190316",
+        "final_attempts": 43584,
+        "final_accepted": 0,
+        "final_rejected": 0,
+        "share_status": "share_unverified",
+        "hmx_q6_boundary": {
+          "records": 21,
+          "first_batch": 32,
+          "first_hmx_mhz": [
+            979,
+            979
+          ],
+          "first_q6_mhz": [
+            2112,
+            1593
+          ],
+          "last_batch": 32,
+          "last_hmx_mhz": [
+            1209,
+            979
+          ],
+          "last_q6_mhz": [
+            2112,
+            1939
+          ]
+        },
+        "hmx_q6_record_count_all": 21,
+        "expected_bytefold_mode": 0,
+        "fixed_prefetch_order": 0
+      },
+      "thermal": {
+        "samples": 87,
+        "median_interval_s": 0.35,
+        "first_npu_max_millic": 77600,
+        "max_npu_millic": 106200,
+        "max_socd_percent": 67,
+        "post10_npu_min_millic": 95000,
+        "post10_npu_max_millic": 106200
+      },
+      "battery_before": {
+        "charging": false,
+        "level": "33",
+        "temperature_raw": "350"
+      },
+      "battery_after": {
+        "charging": false,
+        "level": "33",
+        "temperature_raw": "350"
+      },
+      "zero_delta_post10_windows": 0,
+      "inclusive_zero_rate_gmac_s": 6287.182969702378,
+      "frequency_models": {
+        "Q6": {
+          "harmonic_boundary_mhz": 1900.8394639584237,
+          "reference_reported_mhz": 2112,
+          "boundary_samples": 28,
+          "min_mhz": 1593,
+          "max_mhz": 2112,
+          "modeled_dt_s": 18.002232250313234
+        },
+        "HMX": {
+          "harmonic_boundary_mhz": 956.7959076926104,
+          "reference_reported_mhz": 1209,
+          "boundary_samples": 28,
+          "min_mhz": 672,
+          "max_mhz": 1209,
+          "modeled_dt_s": 15.829523521423981
+        }
+      },
+      "frequency_model_batch_records": 14,
+      "job_records": 1,
+      "miner_log_sha256": "f7ac79ac2c7b57dceeff743677a53b6b6f24a8cdaf424d224d2a192e4b7d097f"
+    },
+    {
+      "leg": 4,
+      "mode": 1,
+      "state": {
+        "status": "complete_bounded",
+        "mode": "1",
+        "expected_tag": "0x42464501",
+        "prep_workers": "4",
+        "start_uptime_cs": "8560247",
+        "stop_uptime_cs": "8563253",
+        "end_uptime_cs": "8563300",
+        "stop_reason": "duration_elapsed",
+        "child_exit_code": "143",
+        "affinity_complete": "1"
+      },
+      "summary": {
+        "prep_workers_expected": 4,
+        "prep_workers_seen": [
+          4
+        ],
+        "prep_workers_match": true,
+        "deep4_mode": 1,
+        "expected_runtime_tag": "0x42464501",
+        "runtime_tag_status": "match",
+        "runtime_tag_lines": 1,
+        "first_post_runtime_tag_stats_line": 10,
+        "runtime_rows_seen": 1,
+        "runtime_rows_without_tag": 0,
+        "npu_start_seen": true,
+        "npu_start_line": 3,
+        "run_status": "complete_bounded",
+        "bounded_healthy_leg": true,
+        "stats_rows": 30,
+        "stats_integrity": true,
+        "malformed_stats_lines": [],
+        "elapsed_lower_bound_seconds": "30.003152",
+        "elapsed_lower_bound_definition": "sum of reported sample_elapsed_s from stats-thread start; omits log/reset overhead and is a conservative lower bound, not absolute launch time",
+        "window_policy": "exclude the first stats row after the first runtime tag because its interval may start pre-tag; also accept only complete 1.0-1.1 s rows with delta>0 whose interval-start cumulative reported-dt lower bound is >=10 s",
+        "first_post_runtime_tag_baseline_excluded": true,
+        "first_10s_excluded_by_lower_bound": true,
+        "affinity_evidence": {
+          "rows": 13,
+          "singleton_allowed_cpus_seen": [
+            "3",
+            "4",
+            "5",
+            "6",
+            "7"
+          ],
+          "required_singleton_masks": [
+            "3",
+            "4",
+            "5",
+            "6",
+            "7"
+          ],
+          "masks_present": true,
+          "role_attribution": "not inferred from CPU masks"
+        },
+        "leg_eligible": true,
+        "accepted_windows": 20,
+        "diagnostic_candidate_windows": 20,
+        "accepted_sum_delta_macs": 135102491262976,
+        "accepted_sum_dt_seconds": "20.001887",
+        "accepted_aggregate_gmac_s": "6754.487277274189180250843333",
+        "accepted_median_gmac_s": "6734.04743788018860362745811",
+        "accepted_mad_gmac_s": "136.845555515638661213418743",
+        "accepted_min_gmac_s": "6184.320003839731218814682972",
+        "accepted_max_gmac_s": "6871.466670933034687571869969",
+        "final_attempts": 47008,
+        "final_accepted": 0,
+        "final_rejected": 0,
+        "share_status": "share_unverified",
+        "hmx_q6_boundary": {
+          "records": 23,
+          "first_batch": 32,
+          "first_hmx_mhz": [
+            1209,
+            979
+          ],
+          "first_q6_mhz": [
+            2112,
+            1708
+          ],
+          "last_batch": 32,
+          "last_hmx_mhz": [
+            1075,
+            979
+          ],
+          "last_q6_mhz": [
+            1708,
+            1939
+          ]
+        },
+        "hmx_q6_record_count_all": 23,
+        "expected_bytefold_mode": 1,
+        "fixed_prefetch_order": 0
+      },
+      "thermal": {
+        "samples": 82,
+        "median_interval_s": 0.37,
+        "first_npu_max_millic": 78000,
+        "max_npu_millic": 106200,
+        "max_socd_percent": 67,
+        "post10_npu_min_millic": 96500,
+        "post10_npu_max_millic": 105400
+      },
+      "battery_before": {
+        "charging": false,
+        "level": "33",
+        "temperature_raw": "350"
+      },
+      "battery_after": {
+        "charging": false,
+        "level": "33",
+        "temperature_raw": "354"
+      },
+      "zero_delta_post10_windows": 0,
+      "inclusive_zero_rate_gmac_s": 6754.487277274189,
+      "frequency_models": {
+        "Q6": {
+          "harmonic_boundary_mhz": 1813.0880465469138,
+          "reference_reported_mhz": 2112,
+          "boundary_samples": 28,
+          "min_mhz": 1382,
+          "max_mhz": 2112,
+          "modeled_dt_s": 17.171014312538876
+        },
+        "HMX": {
+          "harmonic_boundary_mhz": 872.6730749413034,
+          "reference_reported_mhz": 1209,
+          "boundary_samples": 28,
+          "min_mhz": 672,
+          "max_mhz": 1209,
+          "modeled_dt_s": 14.437641218294857
+        }
+      },
+      "frequency_model_batch_records": 14,
+      "job_records": 2,
+      "miner_log_sha256": "bb1907a878bef6e29a4dc8d7347195d23ef1beb1e7cff0f28a04443ef0f271f7"
+    }
+  ],
+  "aggregates": {
+    "0": {
+      "gmac_s": 6259.152431547822,
+      "windows": 40,
+      "delta_macs": 250413773225984,
+      "dt_s": 40.007617,
+      "unthrottled_models_tmac_s": {
+        "Q6": 7.102277772645881,
+        "HMX": 8.072235640438484
+      }
+    },
+    "1": {
+      "gmac_s": 6916.006552001661,
+      "windows": 40,
+      "delta_macs": 276664613339136,
+      "dt_s": 40.003521,
+      "unthrottled_models_tmac_s": {
+        "Q6": 7.76665775801183,
+        "HMX": 9.517416645787689
+      }
+    }
+  },
+  "mode1_relative_rate_percent": 10.494298191926376,
+  "mode0_between_legs_drift_percent": 0.8996156317753412,
+  "mode1_endpoint_drift_percent": -4.56431395891973,
+  "paired_mode1_relative_percent": [
+    13.58343555856294,
+    7.432650040944044
+  ],
+  "gaps_from_previous_stop_to_next_start_s": [
+    0.52,
+    0.7,
+    0.61
+  ],
+  "group_span_s": 122.84,
+  "frequency_model_limits": "Alternative Q6-only and HMX-only linear models using sparse equal-work every64-batch boundary samples; not residency, achieved performance, a confidence interval, or multiplied factors. MHz values are integer-truncated.",
+  "share_responses": {
+    "accepted": 0,
+    "rejected": 0
+  }
+}

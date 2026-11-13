@@ -1,4 +1,20 @@
-/* igpu.h — OpenCL backend for the PRL miner on AMD APUs/iGPUs. */
+/* igpu.h — OpenCL backend for the PRL miner on AMD APUs/iGPUs.
+ *
+ * Target: the Ryzen 9000 desktop integrated Radeon (Granite Ridge: 2 CU
+ * RDNA2, gfx1036, ~2.2 GHz). No CUDA/ROCm/HIP dependency: the backend dlopens
+ * the system OpenCL runtime (Mesa Rusticl/Clover, AMD PAL or ROCm all work).
+ *
+ * Kernel plan (src/igpu_kern.h): one work-item owns exactly one hash tile
+ * (8x16 outputs) with all 128 int32 accumulators in registers — the per-slice
+ * transcript fold is a pure register XOR, no cross-lane reduction anywhere.
+ * A workgroup of 32 items covers one 64x64 output block. Per attempt the
+ * device rebuilds the A-side rank-128 noise and A', runs the sliced GEMM,
+ * hashes each tile and reports hits; B'ᵀ is built once per job, exactly like
+ * the CUDA backend. The nonce trick (8 bytes of A chunk 0 + incremental
+ * Merkle patch) is reused, so an attempt uploads 1 KB + 64 B.
+ *
+ * API mirrors gpu.h one-for-one.
+ */
 #ifndef PRL_IGPU_H
 #define PRL_IGPU_H
 
@@ -30,7 +46,8 @@ int pr_igpu_set_job(pr_igpu_ctx *ctx, const uint8_t header76[76], char *err, siz
 /* upload the share bound for the current pool job (32 bytes = U256 little-endian) */
 void pr_igpu_set_bound(pr_igpu_ctx *ctx, const uint8_t bound_le[32]);
 
-/* coords[i] = t_rows | ((uint64_t)t_cols << 32); digests = 32 bytes per hit. */
+/* one attempt; returns the number of hits (capped at PRL_IGPU_MAXHITS).
+ * coords[i] = t_rows | ((uint64_t)t_cols << 32); digests = 32 bytes per hit. */
 int pr_igpu_attempt(pr_igpu_ctx *ctx, uint64_t nonce, uint64_t *coords, uint8_t *digests);
 
 /* state needed to build the PlainProof for a hit on the host */

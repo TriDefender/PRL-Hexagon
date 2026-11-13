@@ -1,5 +1,5 @@
 typedef octet byte;
-module prl_compound_deep4 {
+module prl_compound_bytefold {
   interface batch {
     long run(in long attempts, in long n, in long flags, in long output_mode,
              in sequence<byte> X, in sequence<byte> W,

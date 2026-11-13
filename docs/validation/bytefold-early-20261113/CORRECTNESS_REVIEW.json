@@ -1,0 +1,43 @@
+{
+  "records": [
+    {
+      "mode": 0,
+      "full_CPU_comparison": "passed: all32 nonces",
+      "full_driver_clean_exit_observed": true,
+      "full_log_sha256": "989322a325bea0119664a89d51af5cb9ee85ef2198a3099259864aeaf848a721",
+      "appchecker": "passed exit0 no watchdog trigger",
+      "app_attempts": 128,
+      "app_scalar_full_attempts": 2,
+      "app_log_sha256": "dabbf707efbffaa01b78d83bccccca4d1d12b3327f62604f5023d688a0f310f8"
+    },
+    {
+      "mode": 1,
+      "full_CPU_comparison": "passed: all32 nonces",
+      "full_driver_clean_exit_observed": false,
+      "full_log_sha256": "ca7defbeee377f22e4a39769f0ef2313712ca9a5a5c2ca64e8c4e1b6d99aff03",
+      "appchecker": "passed exit0 no watchdog trigger",
+      "app_attempts": 128,
+      "app_scalar_full_attempts": 2,
+      "app_log_sha256": "34b579697d95654fc73eb10025a39efdaac854b99a629d75fc05b480b63439f1"
+    }
+  ],
+  "mode1_full_observer_exception": "host35s timeout; full CPU and all successful RPC tag comparisons are complete in device log, but exit_code missing; original test not retried",
+  "mode1_exception_scope": "functional comparison proven; that controller invocation is not a fully passed bounded run",
+  "appchecker_both_normal_exit": true,
+  "performance_claim": null,
+  "next": "bounded real-pool ABBA on verified data path using independent watchdog/recorded execution command",
+  "controlled_mode1_full_driver_r2": {
+    "status": "passed",
+    "mode": 1,
+    "full_driver_clean_exit": 0,
+    "functional_scope": "full32 nonce independent commitment/scalar noise/CPU TT/DSP rawTT/all digests/all masks",
+    "observer": "detached; independent25s watchdog; owned suspend blocker",
+    "watchdog_triggered": false,
+    "wake_release_guard_triggered": false,
+    "original_observer_failure_retained": true,
+    "original_cause": "not separately attributed",
+    "driver_log_sha256": "5707cc1992abcc7b1b345a043ba966542493f5f02fcb26db14d29ca73cf2c939",
+    "performance_data": false
+  },
+  "current_required_full_CPU_and_app_checks": "passed; original observer exception retained"
+}

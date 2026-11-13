@@ -1,0 +1,1 @@
+COMPOUND_BYTEFOLD_OUTER_HOST_PASS actual_outer=1 output_modes=0,1,2 runtime_deep4_mode=1 bytefold_modes=0,1 raw_TT=1 n=64,1024,2048 reload_and_cache=1 rejects_no_side_effect=1 error_recovery=1 runtime_tag_propagated=1 expected_mode_parser=strict invalid_tag_and_mismatch_rejected=1 HMX_simulated=0

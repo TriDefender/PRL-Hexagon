@@ -1,7 +1,8 @@
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE
 #endif
-/* RPC and result masks are simulated; no HMX is modeled. */
+/* Exercises the real adapter and noise record code with software NEON and
+ * portable BLAKE3. RPC and result masks are simulated; no HMX is modeled. */
 #include <assert.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -21,7 +22,7 @@ static int8_t *expected_base;
 static uint64_t expected_first;
 int rpc_calls;
 static int weight_loads, force_failure, host_force_result_failure;
-static uint32_t host_runtime_tag=UINT32_C(0x44454500);
+static uint32_t host_runtime_tag=UINT32_C(0x42464500);
 static int fused_rpc_calls, share_submit_calls;
 unsigned host_compound_result_calls;
 unsigned host_drain_calls;
@@ -145,17 +146,20 @@ static void assert_runtime_tag_failure(pr_attempt_mats *am,uint32_t tag,
     assert(miner_fatal_exit_status(&ms)==2);
     assert(atomic_load(&ms.found)==0&&share_submit_calls==shares_before);
     pr_qnpu_free(bad);
-    host_runtime_tag=UINT32_C(0x44454500);
+    host_runtime_tag=UINT32_C(0x42464500);
     host_force_result_failure=0;
 }
 
 int main(void) {
     setenv("PRL_PERSIST_MAP","0",1);
     char err[256];
-    setenv("PRL_EXPECT_DEEP4_MODE","00",1);
+    unsetenv("PRL_EXPECT_BYTEFOLD_EARLY");
     assert(!pr_qnpu_new(2048,64,2048,err,sizeof(err)));
-    assert(strstr(err,"PRL_EXPECT_DEEP4_MODE must be exactly 0 or 1"));
-    setenv("PRL_EXPECT_DEEP4_MODE","0",1);
+    assert(strstr(err,"PRL_EXPECT_BYTEFOLD_EARLY must be exactly 0 or 1"));
+    setenv("PRL_EXPECT_BYTEFOLD_EARLY","00",1);
+    assert(!pr_qnpu_new(2048,64,2048,err,sizeof(err)));
+    assert(strstr(err,"PRL_EXPECT_BYTEFOLD_EARLY must be exactly 0 or 1"));
+    setenv("PRL_EXPECT_BYTEFOLD_EARLY","0",1);
     pr_qnpu_ctx *c=pr_qnpu_new(2048,64,2048,err,sizeof(err));
     if (!c) {fprintf(stderr,"ADAPTER_HOST_FAIL init %s\n",err);return 1;}
     assert(pr_qnpu_compound_attempts(c)==32);
@@ -193,9 +197,10 @@ int main(void) {
     assert(rpc_calls==4&&weight_loads==2);
     assert(pr_qnpu_macs(c)==(uint64_t)4*32*2048*64*2048);
     assert_runtime_tag_failure(&am,UINT32_C(0x44444600),"host-tag-magic-fault",701);
-    assert_runtime_tag_failure(&am,UINT32_C(0x44454501),"host-tag-mode-fault",801);
-    /* The compound RPC succeeds, then the first result read is injected as
-     * unavailable; this must be fatal without fused fallback. */
+    assert_runtime_tag_failure(&am,UINT32_C(0x42464501),"host-tag-mode-fault",801);
+    /* Exercise an incomplete compound batch result through the production
+     * worker first. The compound RPC succeeds, then the first result read is
+     * injected as unavailable; this must be fatal without fused fallback. */
     const uint8_t fail_header[76] = {1,2,3,4,5};
     pr_fill_base(&am,3030);
     memcpy(expected_base,am.a,(size_t)2048*2048);
@@ -230,8 +235,8 @@ int main(void) {
     assert(miner_fatal_exit_status(&ms)==2);
     assert(atomic_load(&ms.found)==0 && share_submit_calls==0);
 
-    /* It must stop before any compound result read, skip fused
-     * RPC/accounting/submission, then drain. */
+    /* Now inject a real adapter RPC error (-91). It must stop before any
+     * compound result read, skip fused RPC/accounting/submission, then drain. */
     memset(&worker_job,0,sizeof(worker_job));
     worker_job.header[0]=9; worker_job.header[1]=8; worker_job.header[2]=7;
     worker_job.target_be[31]=1;
@@ -262,6 +267,6 @@ int main(void) {
     assert(atomic_load(&ms.found)==0 && share_submit_calls==0);
     assert(pr_qnpu_macs(c)==(uint64_t)5*32*2048*64*2048);
     pr_qnpu_free(c);free(expected_base);free(am.a);free(am.bt);
-    puts("FAILFAST_HOST_PASSED production_worker=1 real_compound_adapter=1 result_failure_fatal=1 injected_compound_rpc_rc=-91 runtime_tag_magic_rejected=1 runtime_tag_expected_mode_rejected=1 tag_fault_rpc_delta=1 tag_fault_fused_rpc_delta=0 tag_fault_result_reads=0 tag_fault_attempts=0 tag_fault_shares=0 compound_rpc_delta=1 fused_rpc_delta=0 result_reads=0 attempts=0 fatal_exit=2 drain=1 drain_rpc_delta=0 share_submits=0 HMX_simulated=0");
+    puts("FAILFAST_HOST_PASSED production_worker=1 real_compound_adapter=1 result_failure_fatal=1 injected_compound_rpc_rc=-91 runtime_tag_magic_rejected=1 runtime_tag_expected_order_rejected=1 tag_fault_rpc_delta=1 tag_fault_fused_rpc_delta=0 tag_fault_result_reads=0 tag_fault_attempts=0 tag_fault_shares=0 compound_rpc_delta=1 fused_rpc_delta=0 result_reads=0 attempts=0 fatal_exit=2 drain=1 drain_rpc_delta=0 share_submits=0 HMX_simulated=0");
     return 0;
 }
