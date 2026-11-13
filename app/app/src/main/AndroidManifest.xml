@@ -19,7 +19,6 @@
         android:roundIcon="@mipmap/ic_launcher"
         android:theme="@style/Theme.PrlMiner"
         android:allowBackup="false"
-        android:extractNativeLibs="true"
         android:usesCleartextTraffic="true">
         <!-- cDSP FastRPC user-space driver (vendor-private lib) must be
              resolvable by the app linker namespace for the bundled miner. -->
