@@ -159,3 +159,29 @@ producer + async stage 线程 + fold workers 装进 4 个 context。
   **~4169 GMAC/s**（wallet prl1p9z3…266sf6 @ pool.peryn.ai:3333，worker 8gen3-e0）。
 - 构建 knobs：`PRL_V75_WORKERS`（默认 2）、`PRL_V75_ASYNC_STAGE`（默认 1）、
   `PRL_V75_HMX_CLOCK`（默认沿用 build.conf）。
+
+## 10. 双架构 APK 端到端验证（App 域，2026-11-14）
+
+APK（HEAD `8faedaa` 构建，sha256 7717a61f…）内含 `_v75`/`_v79` 成对 skeleton +
+架构无关 miner/app-check；DspArch.kt 在自检时解析 SM8650/pineapple → target=v75。
+
+真机（PJD110，Android 16，ColorOS）安装后 **untrusted_app 域六项自检全部 PASS**：
+
+```
+soc        PASS 已检测到高通芯片
+platform   PASS Snapdragon 8 Gen 3，支持 NPU 加速   (soc model=SM8650 board=pineapple target=v75)
+hex        PASS NPU 驱动可用                        (fastrpc lib=true dev=true — /dev/adsprpc-smd 复用节点被接受)
+payload    PASS 挖矿组件完整（v75 载荷已就绪）        (MinerRunner staging 到 files/dsp 规范名成功)
+golden     PASS 计算校验通过，NPU 工作正常            (fused selftest 逐位通过，untrusted_app 域)
+compound   PASS 复合内核校验通过，这台手机可以挖矿     (真实 compound 内核 2 jobs/4 batches/128 nonces)
+```
+
+FastRPC 侧确认：App 域成功创建 unsigned PD（domain 3）、从 `files/dsp/` 加载 v75
+compound skeleton（load time ~5.9ms）、RPC 正常返回。
+
+已知观察：安装后首次启动的 compound 自检曾挂起 >2 分钟（force-stop 后干净重启
+复跑 1.8s 通过，且可稳定复现）。疑似与被杀进程遗留的 DSP 会话状态或首次冷启动
+竞争有关；SelfCheck 的 1200ms 重试未能覆盖该 hang。建议后续给
+`selftestCompound` 的子进程读取加超时强制（timeoutSec 参数已存在但未见强制逻辑）。
+
+双架构互操作不再要求验证（单包单架构自检选择；跨架构编译/验证按设计不做）。
