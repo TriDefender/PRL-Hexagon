@@ -19,6 +19,7 @@
 #include <string.h>
 #include "fused.h"
 #include "AEEStdErr.h"
+#include "HAP_farf.h"
 #include "HAP_perf.h"
 #include "hexagon_types.h"
 #include "hvx_hexagon_protos.h"
@@ -38,9 +39,10 @@
 #ifndef PRL_ASYNC_STAGE
 #define PRL_ASYNC_STAGE 0
 #endif
+#include "compact_format.h"
+#include "fused_noise_compact.h"
 #if PRL_ASYNC_STAGE
 #include "fused_stage.h"
-#include "compact_format.h"
 #endif
 #ifndef PRL_MM4_POINTER
 #define PRL_MM4_POINTER 0
@@ -130,6 +132,7 @@ static unsigned g_clock_call_active;
 
 static uint8_t *g_v;
 static uint32_t g_size;
+static unsigned g_hvx128;
 static int g_init = -1, g_n, g_retained, g_bias_ready, g_complement_ready;
 static int g_pipeline_poisoned;
 static uint64_t g_profile_lifecycle_cycles;
@@ -165,6 +168,13 @@ static int initialize(void) {
         uint32_t rate;
         g_init = hexkl_micro_hw_init(&g_v, &g_size, &rate);
         if (!g_init) g_init = hexkl_micro_hmx_lock();
+        /* The HVX fold pool needs one free HVX context for the producer
+         * thread on top of every worker. v79 (8 Elite) exposes eight
+         * contexts; v75 (8 Gen 3) cDSP reports four 128B units, so the
+         * stock four-worker pool cannot lock there and the run aborts
+         * with worker lock failures. */
+        const int units=qurt_hvx_get_units();
+        g_hvx128=(units>0)?(unsigned)((units>>8)&0xFFu):0u;
     }
     return g_init;
 }
@@ -548,6 +558,10 @@ PRL_MULTI_IMPLEMENTATION int PRL_MULTI_NAME(int m,int n,int flags,const byte *X,
                     (const uint8_t *)X+(size_t)(rb+1)*PRL_DMA_BLOCK_BYTES,g_v+next);
                 if (rc) goto finish;
             }
+        } else if (hash && hash->compact_input) {
+            /* No stage thread (v75 three-worker layout): build the compact
+             * noise block inline, exactly as prl_stage_main does. */
+            prl_noise_make_block(X,(uint32_t)rb,g_v+act);
         } else if (flags&8192) {
             prl_pack_signed_rm_block(g_v+act,(const int8_t *)X,m,rb);
         } else {
@@ -890,6 +904,23 @@ static int fused_run_core(int m,int n,int flags,const byte *X,int XLen,
     const uint32_t dv_size=16u*n*4u;
     unsigned multi_workers=selected_multi_workers(m,flags);
     if (multi_workers>(unsigned)n/64u) multi_workers=(unsigned)n/64u;
+    /* Every concurrent HVX locker needs its own context: the producer band
+     * thread, the async stage thread (when active), and each fold pool
+     * worker. The pools launched below re-derive this same count from
+     * (m,flags), so this budget check is an authoritative pre-flight that
+     * fails the call before any pool starts when the build's compile-time
+     * worker count cannot lock. The real per-SoC fix is compile-time: the
+     * v75 cDSP (SM8650) reports four 128B units against the stock
+     * four-worker pool plus producer plus stage, so scripts/build-dsp.sh
+     * substitutes PRL_GROUP_WORKERS=2 there; v79 (SM8750, eight contexts)
+     * keeps the stock layout. */
+    if (g_hvx128) {
+        unsigned budget=g_hvx128-1u; /* producer band lock */
+#if PRL_ASYNC_STAGE
+        if (use_async_stage(m,flags)&&budget) budget--; /* stage thread lock */
+#endif
+        if (multi_workers>budget) return AEE_EFAILED;
+    }
     uint32_t need;
 #if PRL_COMPACT_VTCM
     /* Policy 2 preserves every legacy-capable complement mode through n1600.

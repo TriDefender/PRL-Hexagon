@@ -53,7 +53,6 @@ android {
             useLegacyPackaging = true
             keepDebugSymbols += "**/*.so"
         }
-        doNotStrip += "**/*.so"
     }
 }
 

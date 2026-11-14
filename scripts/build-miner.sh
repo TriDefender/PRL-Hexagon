@@ -3,7 +3,10 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SDK="${HEXAGON_SDK_ROOT:?set HEXAGON_SDK_ROOT to a Hexagon SDK 6.3 install}"
 NDK="${ANDROID_NDK_ROOT:?set ANDROID_NDK_ROOT to an Android NDK r27c install}"
-OUT="${PRL_PAYLOAD_DIR:-$ROOT/payloads}"
+# The ARM miner and app-check are DSP-arch independent; per-SoC DSP payloads
+# live in their own folders (scripts/build-dsp.sh). The APK takes the miner
+# from here and the skeletons from the SoC folders.
+OUT="${PRL_PAYLOAD_DIR:-$ROOT/common}"
 BUILD="${PRL_BUILD_DIR:-$ROOT/build}"
 CC="$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android26-clang"
 

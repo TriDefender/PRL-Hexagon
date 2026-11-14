@@ -28,6 +28,10 @@
 #include "noise_compact_neon.h"
 #include "qnpu_prep_pool.h"
 
+/* HAP_POWER_ERR_UNSUPPORTED_API from the DSP's HAP_power.h; mirrored here so
+ * the ARM side can accept the clock-unsupported diag marker. */
+#define PRL_CLOCK_RC_UNSUPPORTED (-3)
+
 #pragma weak remote_register_buf_attr2
 
 #define FUSED_FLAGS 35698
@@ -432,11 +436,25 @@ static int decode_bytefold_runtime_tag(uint32_t tag, unsigned *mode) {
     return 1;
 }
 
+/* A clock diag slot is either a real query (rc=0, Hz>0) or the DSP-side
+ * "unsupported" marker used by pre-v79 firmware whose loader rejects any
+ * ELF importing HAP_power_get (HAP_POWER_ERR_UNSUPPORTED_API = -3 from the
+ * SDK's HAP_power.h, mirrored by PRL_CLOCK_RC_UNSUPPORTED below; if the SDK
+ * ever renumbers it, impl.c's stub and this check must change together). */
+static int clock_slot_ok(uint32_t rc_w, uint32_t hz_w) {
+    if (rc_w == 0u) return hz_w != 0u;
+    return (int32_t)rc_w == PRL_CLOCK_RC_UNSUPPORTED && hz_w == 0u;
+}
+
 static int compound_summary_valid(pr_qnpu_ctx *c, const compound_slot *s,
                                   int rc, uint64_t cycles) {
     if (rc) {
-        fprintf(stderr, "[prl-miner] compound DSP RPC failed rc=%d (0x%x); payload ignored\n",
-                rc, (unsigned)rc);
+        const uint32_t *d = s->out + (size_t)c->bands * c->compound_attempts;
+        fprintf(stderr, "[prl-miner] compound DSP RPC failed rc=%d (0x%x); payload ignored\n"
+                "  diag: ver=%u n=%u flags=%x init=%u core=%u clocks=%u/%u/%u/%u tag=%08x\n",
+                rc, (unsigned)rc, d[CB_VERSION], d[CB_N], d[CB_FLAGS],
+                d[CB_INIT_RC], d[CB_CORE_RC], d[CB_PRE_Q6_RC], d[CB_PRE_HMX_RC],
+                d[CB_POST_Q6_RC], d[CB_POST_HMX_RC], d[CB_RUNTIME_KERNEL_TAG]);
         return 0;
     }
     const size_t words = c->bands * c->compound_attempts;
@@ -451,9 +469,10 @@ static int compound_summary_valid(pr_qnpu_ctx *c, const compound_slot *s,
         d[CB_ATTEMPTS_DONE] != c->compound_attempts || d[CB_POISON] ||
         d[CB_CORE_RC] || d[CB_INIT_RC] || d[CB_BEGIN_RC] || d[CB_END_RC] ||
         d[CB_POLICY] != 1 || d[CB_PREPARE] ||
-        d[CB_PRE_Q6_RC] || !d[CB_PRE_Q6_HZ] || d[CB_PRE_HMX_RC] ||
-        !d[CB_PRE_HMX_HZ] || d[CB_POST_Q6_RC] || !d[CB_POST_Q6_HZ] ||
-        d[CB_POST_HMX_RC] || !d[CB_POST_HMX_HZ] ||
+        !clock_slot_ok(d[CB_PRE_Q6_RC], d[CB_PRE_Q6_HZ]) ||
+        !clock_slot_ok(d[CB_PRE_HMX_RC], d[CB_PRE_HMX_HZ]) ||
+        !clock_slot_ok(d[CB_POST_Q6_RC], d[CB_POST_Q6_HZ]) ||
+        !clock_slot_ok(d[CB_POST_HMX_RC], d[CB_POST_HMX_HZ]) ||
         d[CB_OUTPUT_WORDS] != words || d[CB_WORDS_PER_ATTEMPT] != c->bands ||
         d[CB_KERNEL_POISON] || d[CB_MAX_CHUNK] != PRL_COMPOUND_MAX_CHUNK ||
         compound_diag_u64(d, CB_OUTER_PCYCLES) != cycles ||
@@ -789,7 +808,22 @@ static void compound_backend_init(pr_qnpu_ctx *c) {
             return;
         }
     }
-    const int cpus[4] = {7, 6, 5, 4};
+    /* Prep pins follow each SoC's topology: 8 Elite (sun) big cores 4-7 by
+     * default; override per device with PRL_COMPOUND_PREP_CPUS="a,b,c,d"
+     * (8 Gen 3/pineapple: 7=X4 prime, 2-4=A720 3.15G, 5-6=A720 2.96G,
+     * 0-1=A520 little). */
+    int cpus[4] = {7, 6, 5, 4};
+    const char *cpus_env = getenv("PRL_COMPOUND_PREP_CPUS");
+    if (cpus_env != NULL) {
+        unsigned got = 0;
+        for (const char *p = cpus_env; got < 4u && *p;) {
+            char *end = NULL;
+            long v = strtol(p, &end, 10);
+            if (end == p || v < 0 || v >= CPU_SETSIZE) break;
+            cpus[got++] = (int)v;
+            p = (*end == ',') ? end + 1 : end;
+        }
+    }
     const unsigned prep_workers = compound_prep_workers();
     const int prep_rc = prl_prep_pool_start(&c->prep_pool, prep_workers, cpus,
                                             prep_pool_pin);

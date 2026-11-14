@@ -1,1 +1,1 @@
-Populated by scripts/build-apk.sh from source-built payloads.
+Populated by scripts/build-apk.sh from the SoC payload folders (SM*/) and common/.
