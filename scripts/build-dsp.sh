@@ -16,6 +16,29 @@ QAIC="$SDK/ipc/fastrpc/qaic/bin/qaic"
 
 source "$ROOT/dsp/compound/build.conf"
 
+if [[ "$ARCH" == "v75" ]]; then
+  # The v75 cDSP (Snapdragon 8 Gen 3) exposes four HVX contexts. The stock
+  # hot path is compiled for four fold workers plus a producer and an async
+  # stage thread — six concurrent qurt_hvx_lock(128B) users — which cannot
+  # lock on v75 and aborts the run. Every orchestration layout must fit
+  # producer + optional stage thread + fold workers inside four contexts.
+  #   PRL_V75_WORKERS       fold pool size (default 2, with stage thread)
+  #   PRL_V75_ASYNC_STAGE   1 = dedicated stage thread (default), 0 = the
+  #                         producer stages inline and the freed context
+  #                         buys one more fold worker
+  #   PRL_V75_HMX_CLOCK     PRL_HMX_CLOCK_POLICY override (default: keep
+  #                         build.conf's value)
+  V75_WORKERS="${PRL_V75_WORKERS:-2}"
+  V75_ASYNC="${PRL_V75_ASYNC_STAGE:-1}"
+  PRL_KERNEL_DEFINES=("${PRL_KERNEL_DEFINES[@]/-DPRL_GROUP_WORKERS=4/-DPRL_GROUP_WORKERS=$V75_WORKERS}")
+  if [[ "$V75_ASYNC" != "1" ]]; then
+    PRL_KERNEL_DEFINES=("${PRL_KERNEL_DEFINES[@]/-DPRL_ASYNC_STAGE=1/-DPRL_ASYNC_STAGE=0}")
+  fi
+  if [[ -n "${PRL_V75_HMX_CLOCK:-}" ]]; then
+    PRL_KERNEL_DEFINES=("${PRL_KERNEL_DEFINES[@]/-DPRL_HMX_CLOCK_POLICY=*/-DPRL_HMX_CLOCK_POLICY=$PRL_V75_HMX_CLOCK}")
+  fi
+fi
+
 ARCHNUM="${ARCH#v}"
 if [[ ! -d "$SDK/rtos/qurt/computev$ARCHNUM" ]]; then
   echo "Hexagon SDK at $SDK has no computev$ARCHNUM QURT tree" >&2

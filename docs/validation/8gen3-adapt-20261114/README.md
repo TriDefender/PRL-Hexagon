@@ -129,3 +129,33 @@ ELF 校验：`hexagon-readelf -h` → Flags: 0x75, V75（对照 v79 载荷 0x79,
 | G16 compound 布局 | ~8 MiB VTCM | init_rc=0，真机通过 | ✅ 能跑 |
 | 4-worker fold 池 | 6 个并发 HVX context | v75 只有 4 个 | ❌ 不能跑 → v75 编译期 2 workers（实测 3.09 TMAC/s） |
 | HAP_power_get 时钟查询 | v79 固件符号 | v75 固件无导出 | ❌ 不能跑 → v7x 时钟 stub（diag 标记 unsupported），挖矿不受影响 |
+
+## 9. v75 编排优化 A/B（2026-11-14，真机 20s bench）
+
+HVX context 预算 = 4（`qurt_hvx_get_units()` 实测 v75 cDSP 4×128B）。所有布局必须把
+producer + async stage 线程 + fold workers 装进 4 个 context。
+
+| 变体 | 布局 | GMAC/s（20s bench） | 结论 |
+|---|---|---|---|
+| E0（默认/最优） | producer + **stage 线程** + 2 workers | 4239→4201（冷→温） | **基准** |
+| E1' | producer（内联 compact 噪声打包）+ **3 workers** | 3764（**-11%**） | ✗ 丢掉 stage 重叠代价大于 +1 worker |
+| E2 | E0 + kernel 级 HMX 时钟投票 policy1（pick_default） | 4138（-2%） | ✗ 无增益 |
+| E3 | E0 + kernel 级 HMX corner MAX（policy4） | 4177（-1%） | ✗ HMX 默认时钟已最高 |
+| E4 | E0 + kernel 级 HMX corner TUR（policy3） | 4176（-1%） | ✗ 同上 |
+| prep 亲和 {7,4,3,2} vs {7,6,5,4} | miner ARM prep pool 拓扑映射 | 4178 vs 4176（0%） | 预备完全被隐藏（RPC-bound），仅作拓扑保险 knob |
+
+关键编排事实：
+- **async stage 线程的重叠价值 > 第 3 个 fold worker**：stage 线程持有 HVX context
+  做 `prl_noise_make_block`（compact 噪声打包，HVX 真活），把 ~15ms/批的 prep 从
+  producer 关键路径完全隐藏；内联化后 producer 串行做打包，反而变慢。
+- 8 Gen 3 CPU 拓扑：cpu0-1=A520 2.27G / cpu2-4=A720 3.15G / cpu5-6=A720 2.96G /
+  cpu7=X4 3.3G。miner prep pool 默认 pins {7,6,5,4} 避开小核；新增
+  `PRL_COMPOUND_PREP_CPUS="a,b,c,d"` 环境变量可按设备覆盖。
+- DCVS 侧 E0 已通过 impl.c 的 policy1 投票锁 Q6/总线 MAX corner（所有 policy 都含
+  DCVS_v3 MAX + sleep_disable）；kernel 级再加 HMX 投票只增加每 RPC 两个 power
+  调用的开销。
+- 最终生产编排（v75）：`PRL_GROUP_WORKERS=2` + `PRL_ASYNC_STAGE=1` +
+  kernel `PRL_HMX_CLOCK_POLICY=0` + impl.c policy1 投票；真池长测持续
+  **~4169 GMAC/s**（wallet prl1p9z3…266sf6 @ pool.peryn.ai:3333，worker 8gen3-e0）。
+- 构建 knobs：`PRL_V75_WORKERS`（默认 2）、`PRL_V75_ASYNC_STAGE`（默认 1）、
+  `PRL_V75_HMX_CLOCK`（默认沿用 build.conf）。

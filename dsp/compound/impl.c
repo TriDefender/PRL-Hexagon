@@ -11,7 +11,10 @@
 #include "snapshot/fused_power_vote.h"
 #include "HAP_perf.h"
 
+#if !defined(PRL_DSP_ARCH_NUM) || PRL_DSP_ARCH_NUM >= 79
 extern int HAP_power_get(void *,HAP_power_response_t *) __attribute__((weak));
+#define PRL_HAVE_HAP_POWER_GET 1
+#endif
 static prl_hmx_vote g_vote;
 static unsigned g_call_active;
 static int g_poison;
@@ -19,6 +22,7 @@ static void complete(void) {__asm__ volatile("syncht":::"memory");}
 static uint64_t get64(const uint32_t *d,unsigned i) {return d[i]|((uint64_t)d[i+1]<<32);}
 static void put64(uint32_t *d,unsigned i,uint64_t x) {d[i]=(uint32_t)x;d[i+1]=(uint32_t)(x>>32);}
 static int clocks(uint32_t *d,unsigned at) {
+#if PRL_HAVE_HAP_POWER_GET
     HAP_power_response_t r;int rc;
     memset(&r,0,sizeof(r));r.type=HAP_power_get_clk_Freq;
     rc=HAP_power_get?HAP_power_get(NULL,&r):HAP_POWER_ERR_UNSUPPORTED_API;
@@ -27,6 +31,14 @@ static int clocks(uint32_t *d,unsigned at) {
     const int hrc=HAP_power_get?HAP_power_get(NULL,&r):HAP_POWER_ERR_UNSUPPORTED_API;
     d[at+2]=(uint32_t)hrc;d[at+3]=hrc?0:r.clkFreqHz;
     return rc||hrc?AEE_EFAILED:0;
+#else
+    /* Pre-v79 firmware (e.g. SM8650/v75) does not export HAP_power_get and the
+     * DSP loader rejects any ELF importing it, weak or not. Record unsupported
+     * clocks in the diag words without failing the mining run. */
+    d[at]=(uint32_t)HAP_POWER_ERR_UNSUPPORTED_API;d[at+1]=0;
+    d[at+2]=(uint32_t)HAP_POWER_ERR_UNSUPPORTED_API;d[at+3]=0;
+    return 0;
+#endif
 }
 
 int prl_compound_bytefold_batch_run(int attempts,int n,int flags,int output_mode,
@@ -101,11 +113,11 @@ int prl_compound_bytefold_batch_run(int attempts,int n,int flags,int output_mode
             (int)(chunk_words+64u),&chunk_cycles);
         summary[CB_CORE_RC]=(uint32_t)rc;
         if (prl_compound_kernel_poisoned()) g_poison=1;
-        if (rc) break;
         /* This call returned only after all output writers were quiet. The
          * temporary tail may overlap the next chunk's first 64 result words. */
         uint32_t diag[64];
         memcpy(diag,result+(size_t)base*per_attempt+chunk_words,sizeof(diag));
+        if (rc) break;
         core_ticks+=get64(diag,56);kernel_ticks+=get64(diag,58);
         core_pcycles+=get64(diag,14);
         summary[CB_SUM_STAGE_PCY]+=(uint32_t)get64(diag,6);
