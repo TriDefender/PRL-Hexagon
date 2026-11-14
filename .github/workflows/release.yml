@@ -68,8 +68,13 @@ jobs:
       - name: Fetch toolchains
         run: bash scripts/fetch-deps.sh
 
-      - name: Build DSP skeletons
+      - name: Build DSP skeletons (v79, Snapdragon 8 Elite)
         run: bash scripts/build-dsp.sh
+
+      - name: Build DSP skeletons (v75, Snapdragon 8 Gen 3)
+        run: |
+          PRL_DSP_ARCH=v75 PRL_PAYLOAD_DIR="$GITHUB_WORKSPACE/payloads-v75" \
+            bash scripts/build-dsp.sh
 
       - name: Build miner
         run: bash scripts/build-miner.sh
@@ -114,7 +119,7 @@ jobs:
           variant=release
           if [[ "$apk" == *debug* ]]; then variant=debug; fi
           mv "$apk" "dist/prl-npu-miner-${TAG}-${variant}.apk"
-          sha256sum payloads/*.so dist/*.apk > dist/SHA256SUMS
+          sha256sum payloads/*.so payloads-v75/*.so dist/*.apk > dist/SHA256SUMS
           {
             echo "## prl-npu-miner ${TAG} (${GITHUB_REF_NAME})"
             echo
@@ -124,7 +129,7 @@ jobs:
             cat dist/SHA256SUMS
             echo '```'
             echo
-            echo "Requires a Snapdragon 8 Elite class device (Hexagon v79 cDSP with HVX+HMX) running Android 12+. The app runs an on-device selftest on first launch."
+            echo "One APK carries every supported DSP payload: Hexagon v79 (Snapdragon 8 Elite, SM8750) and v75 (Snapdragon 8 Gen 3, SM8650), HVX+HMX cDSP, Android 12+. The on-device self-check picks the payload for this SoC and stages it before mining starts."
           } > dist/release-notes.md
 
       - uses: softprops/action-gh-release@v2

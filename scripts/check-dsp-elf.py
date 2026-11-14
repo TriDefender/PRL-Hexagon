@@ -10,13 +10,18 @@ import struct
 import sys
 
 
-def check(path):
+def check(path, expected_arch=None):
     data = Path(path).read_bytes()
     if data[:6] != b"\x7fELF\x01\x01":
         raise ValueError("expected ELF32 little-endian")
     header = struct.unpack_from("<16sHHIIIIIHHHHHH", data)
     if header[1:3] != (3, 164):  # ET_DYN, EM_HEXAGON
         raise ValueError("expected Hexagon shared library")
+    if expected_arch is not None and (header[7] & 0xFF) != expected_arch:
+        # e_flags carries the compute target (0x75 = V75, 0x79 = V79, ...).
+        # A payload packaged under the wrong arch suffix would fail to load
+        # only at self-check time on the device; reject it here instead.
+        raise ValueError(f"ELF arch 0x{header[7] & 0xFF:x}, expected 0x{expected_arch:x}")
 
     def records(offset, count, stride, fmt):
         size = struct.calcsize(fmt)
@@ -57,11 +62,15 @@ def check(path):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        sys.exit("usage: check-dsp-elf.py library.so [library.so ...]")
-    for filename in sys.argv[1:]:
+    import argparse
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--arch", type=lambda s: int(s, 0), default=None,
+                        help="expected compute target in e_flags, e.g. 0x75 or 0x79")
+    parser.add_argument("libraries", nargs="+")
+    args = parser.parse_args()
+    for filename in args.libraries:
         try:
-            check(filename)
+            check(filename, args.arch)
         except (ValueError, IndexError, ZeroDivisionError, struct.error) as error:
             sys.exit(f"DSP_ELF_FAIL {filename}: {error}")
         print(f"DSP_ELF_PASS {filename}")

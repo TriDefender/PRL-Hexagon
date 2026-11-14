@@ -49,26 +49,45 @@ class MinerRunner(ctx: Context) {
 
     val workDir: File get() = File(appCtx.filesDir, "work")
     val nativeDir: String get() = appCtx.applicationInfo.nativeLibraryDir
+
+    /**
+     * Staged canonical DSP skeletons for this device's arch. The APK packs one
+     * skeleton set per arch under an arch suffix; prepare() copies the set the
+     * self-check selected into dspDir under the names FastRPC expects, and
+     * dspDir leads ADSP_LIBRARY_PATH so only that arch can load.
+     */
+    val dspDir: File get() = File(appCtx.filesDir, "dsp")
+    val arch: DspArch.Target? by lazy { DspArch.forThisDevice() }
+
     val minerBin: File get() = File(nativeDir, MINER)
     val appCheckBin: File get() = File(nativeDir, APPCHECK)
     val goldenFile: File get() = File(workDir, GOLDEN)
     private val pidFile: File get() = File(workDir, "miner.pid")
 
-    val skelNames = listOf(FUSED_SKEL, COMPOUND_SKEL)
-
     val payloadReady: Boolean
         get() {
             if (!minerBin.exists() || !minerBin.canExecute()) return false
-            if (!skelNames.all { File(nativeDir, it).exists() }) return false
-            return appCheckBin.exists() && appCheckBin.canExecute()
+            if (!appCheckBin.exists() || !appCheckBin.canExecute()) return false
+            val a = arch ?: return false
+            return DspArch.canonicalSkels.all {
+                File(dspDir, it).exists() &&
+                    File(nativeDir, DspArch.packedSkel(a.arch, it)).exists()
+            }
         }
 
-    /** Copy the golden vectors into app-private storage and verify the payload. */
+    /** Copy the golden vectors and this arch's skeletons into app-private storage. */
     fun prepare(): Boolean {
         return try {
             workDir.mkdirs()
             appCtx.assets.open(GOLDEN).use { ins ->
                 goldenFile.outputStream().use { os -> ins.copyTo(os) }
+            }
+            val a = arch ?: return false
+            dspDir.mkdirs()
+            for (canonical in DspArch.canonicalSkels) {
+                File(nativeDir, DspArch.packedSkel(a.arch, canonical)).inputStream().use { ins ->
+                    File(dspDir, canonical).outputStream().use { os -> ins.copyTo(os) }
+                }
             }
             payloadReady
         } catch (_: Exception) {
@@ -84,8 +103,9 @@ class MinerRunner(ctx: Context) {
     }
 
     private fun envExports(): String = buildString {
-        // FastRPC uses semicolon-separated DSP library directories.
-        append("export ADSP_LIBRARY_PATH='$nativeDir'\n")
+        // FastRPC uses semicolon-separated DSP library directories; dspDir
+        // leads so only the self-check-selected arch skeleton can be found.
+        append("export ADSP_LIBRARY_PATH='$dspDir;$nativeDir'\n")
         // Pin early byte-fold: every compound RPC must report 0x42464501.
         append("export PRL_EXPECT_BYTEFOLD_EARLY=1\n")
         // /system/lib64 must precede /vendor/lib64: vendor libbinder.so lacks
@@ -411,8 +431,6 @@ class MinerRunner(ctx: Context) {
         const val MAX_HISTORY = 300 // 1 s stats -> 5 min window
         const val LOG_CAP = 14
         const val MINER = "libprlminer.so"
-        const val FUSED_SKEL = "libprl_fused_fused_skel.so"
-        const val COMPOUND_SKEL = "libprl_compound_bytefold_batch_skel.so"
         const val APPCHECK = "libprlappcheck.so"
         const val GOLDEN = "golden.txt"
         const val DEV_WALLET =

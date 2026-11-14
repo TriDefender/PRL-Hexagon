@@ -5,6 +5,10 @@ SDK="${HEXAGON_SDK_ROOT:?set HEXAGON_SDK_ROOT to a Hexagon SDK 6.3 install}"
 HK="${HEXKL_ROOT:?set HEXKL_ROOT to a hexkl_addon 1.0-beta.2 tree}"
 OUT="${PRL_PAYLOAD_DIR:-$ROOT/payloads}"
 BUILD="${PRL_BUILD_DIR:-$ROOT/build}"
+# Target compute DSP architecture: v79 (Snapdragon 8 Elite, SM8750) or
+# v75 (Snapdragon 8 Gen 3, SM8650). 8 Gen 3's cDSP is Hexagon v75, with a
+# v73 backward-compatibility target; the payload ELF must match the device.
+ARCH="${PRL_DSP_ARCH:-v79}"
 UDMA="$SDK/addons/compute/libs/userdma/utils_lib"
 TOOLS="$SDK/tools/HEXAGON_Tools/19.0.04/Tools/bin"
 HEX="$TOOLS/hexagon-clang"
@@ -12,19 +16,30 @@ QAIC="$SDK/ipc/fastrpc/qaic/bin/qaic"
 
 source "$ROOT/dsp/compound/build.conf"
 
+ARCHNUM="${ARCH#v}"
+if [[ ! -d "$SDK/rtos/qurt/computev$ARCHNUM" ]]; then
+  echo "Hexagon SDK at $SDK has no computev$ARCHNUM QURT tree" >&2
+  exit 1
+fi
+if [[ ! -f "$HK/lib/6.3.0.0/hexagon_toolv88_$ARCH/libhexkl_micro.a" ]]; then
+  echo "HexKL addon has no hexagon_toolv88_$ARCH libhexkl_micro.a" >&2
+  exit 1
+fi
+
 HEXFLAGS=(
-  -O3 -fPIC -std=gnu99 -mv79 -mhvx -mhmx -mhvx-length=128B -G0
+  -O3 -fPIC -std=gnu99 -m$ARCH -mhvx -mhmx -mhvx-length=128B -G0
+  -DPRL_DSP_ARCH_NUM=$ARCHNUM
   -fno-zero-initialized-in-bss -DUSE_OS_QURT
-  -I"$SDK/incs/stddef" -I"$SDK/incs" -I"$SDK/rtos/qurt/computev79/include/qurt"
-  -I"$SDK/rtos/qurt/computev79/include/posix" -I"$SDK/ipc/fastrpc/incs"
+  -I"$SDK/incs/stddef" -I"$SDK/incs" -I"$SDK/rtos/qurt/computev$ARCHNUM/include/qurt"
+  -I"$SDK/rtos/qurt/computev$ARCHNUM/include/posix" -I"$SDK/ipc/fastrpc/incs"
   -I"$SDK/ipc/fastrpc/remote/ship/inc" -I"$HK/include" -I"$UDMA/api" -I"$UDMA/inc"
 )
-LINKFLAGS=(-mv79 -mhvx -mhmx -mhvx-length=128B -G0 -fPIC
+LINKFLAGS=(-m$ARCH -mhvx -mhmx -mhvx-length=128B -G0 -fPIC
   -Wl,-Bsymbolic -Wl,--exclude-libs,ALL -shared)
 # Static archives must follow the objects that reference them. Firmware does
 # not supply HexKL: unresolved hexkl_* imports are a broken payload.
 LINKLIBS=(-Wl,--start-group
-  "$HK/lib/6.3.0.0/hexagon_toolv88_v79/libhexkl_micro.a" -Wl,--end-group -lc)
+  "$HK/lib/6.3.0.0/hexagon_toolv88_$ARCH/libhexkl_micro.a" -Wl,--end-group -lc)
 KERNEL_COMMON=(-Dprl_fused_fused_run=prl_compound_kernel_run
   -Dprl_fused_fused_run_hash=prl_compound_kernel_run_hash)
 
@@ -72,7 +87,7 @@ else
   done
 fi
 
-python3 "$ROOT/scripts/check-dsp-elf.py" \
+python3 "$ROOT/scripts/check-dsp-elf.py" --arch "0x$ARCHNUM" \
   "$OUT/libprl_fused_fused_skel.so" "$OUT/$PRL_SKEL_LIB"
 
 echo "== payload hashes =="

@@ -64,30 +64,40 @@ class SelfCheck(private val miner: MinerRunner) {
         android.util.Log.i("PrlCheck", "soc manufacturer=$socMfr")
         if (!qualcomm) return finish(st, onProgress)
 
-        // 2. Snapdragon 8 Elite / Hexagon v79 (the bundled skeleton is v79-only)
+        // 2. Resolve the SoC to a Hexagon target the APK carries a payload for.
+        //    Each supported arch ships its own skeleton set (see DspArch);
+        //    adding a future SoC is one table entry plus the payload build.
         item("platform") { it.copy(result = CheckResult.RUNNING) }
         val socModel = prop("ro.soc.model").ifBlank { Build.SOC_MODEL }
         val board = prop("ro.board.platform")
         val abiOk = Build.SUPPORTED_ABIS.any { it == "arm64-v8a" }
-        val elite = (socModel.equals("SM8750", true) || board.equals("sun", true)) && abiOk
+        val target = DspArch.forDevice(socModel, board)
+        val supported = target != null && abiOk
         item("platform") {
             it.copy(
-                result = if (elite) CheckResult.PASS else CheckResult.FAIL,
-                detail = if (elite) "Snapdragon 8 Elite，支持 NPU 加速"
+                result = if (supported) CheckResult.PASS else CheckResult.FAIL,
+                detail = if (supported) "${target!!.label}，支持 NPU 加速"
                 else "这台手机的型号暂不支持 NPU 挖矿",
             )
         }
-        android.util.Log.i("PrlCheck", "soc model=$socModel board=$board abiOk=$abiOk")
-        if (!elite) return finish(st, onProgress)
+        android.util.Log.i("PrlCheck", "soc model=$socModel board=$board abiOk=$abiOk target=${target?.arch}")
+        if (!supported) return finish(st, onProgress)
 
-        // 3. Hexagon NPU user-space pieces.
+        // 3. Hexagon NPU user-space pieces. 8 Elite exposes the per-domain
+        //    /dev/fastrpc-cdsp node; some 8 Gen 3 kernels (e.g. OnePlus/
+        //    ColorOS on SM8650) keep only the multiplexed /dev/adsprpc-smd
+        //    node, which libcdsprpc.so also uses for CDSP sessions.
         item("hex") { it.copy(result = CheckResult.RUNNING) }
         val lib = listOf(
             "/vendor/lib64/libcdsprpc.so",
             "/system/lib64/libcdsprpc.so",
             "/odm/lib64/libcdsprpc.so",
         ).any { File(it).exists() }
-        val dev = File("/dev/fastrpc-cdsp").exists()
+        val dev = listOf(
+            "/dev/fastrpc-cdsp",
+            "/dev/cdsprpc-smd",
+            "/dev/adsprpc-smd",
+        ).any { File(it).exists() }
         val hexOk = lib && dev
         item("hex") {
             it.copy(
@@ -98,13 +108,15 @@ class SelfCheck(private val miner: MinerRunner) {
         android.util.Log.i("PrlCheck", "fastrpc lib=$lib dev=$dev")
         if (!hexOk) return finish(st, onProgress)
 
-        // 4. Payload
+        // 4. Payload: stage this arch's skeletons under the canonical FastRPC
+        //    names and verify everything the miner needs is in place.
         item("payload") { it.copy(result = CheckResult.RUNNING) }
         val ready = miner.prepare() && miner.payloadReady
         item("payload") {
             it.copy(
                 result = if (ready) CheckResult.PASS else CheckResult.FAIL,
-                detail = if (ready) "挖矿组件完整" else "挖矿组件缺失，请重新安装应用",
+                detail = if (ready) "挖矿组件完整（${miner.arch?.arch} 载荷已就绪）"
+                else "挖矿组件缺失，请重新安装应用",
             )
         }
         if (!ready) return finish(st, onProgress)
