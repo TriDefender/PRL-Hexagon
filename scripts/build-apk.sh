@@ -23,6 +23,14 @@ source "$ROOT/dsp/compound/build.conf"
 for pair in "${PAIRS[@]}"; do
   soc="${pair%%:*}"; flag="${pair#*:}"
   dir="$ROOT/$soc"
+  # Fail loudly rather than skipping: an APK without this SoC's payload
+  # would only surface as a self-check failure on that device.
+  for f in libprl_fused_fused_skel.so "$PRL_SKEL_LIB"; do
+    [[ -f "$dir/$f" ]] || {
+      echo "missing $dir/$f — build it first: PRL_SOC=$soc bash scripts/build-dsp.sh" >&2
+      exit 1
+    }
+  done
   python3 "$ROOT/scripts/check-dsp-elf.py" --arch "$flag" \
     "$dir/libprl_fused_fused_skel.so" "$dir/$PRL_SKEL_LIB"
 done

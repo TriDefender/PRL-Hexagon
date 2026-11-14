@@ -113,11 +113,11 @@ int prl_compound_bytefold_batch_run(int attempts,int n,int flags,int output_mode
             (int)(chunk_words+64u),&chunk_cycles);
         summary[CB_CORE_RC]=(uint32_t)rc;
         if (prl_compound_kernel_poisoned()) g_poison=1;
+        if (rc) break;
         /* This call returned only after all output writers were quiet. The
          * temporary tail may overlap the next chunk's first 64 result words. */
         uint32_t diag[64];
         memcpy(diag,result+(size_t)base*per_attempt+chunk_words,sizeof(diag));
-        if (rc) break;
         core_ticks+=get64(diag,56);kernel_ticks+=get64(diag,58);
         core_pcycles+=get64(diag,14);
         summary[CB_SUM_STAGE_PCY]+=(uint32_t)get64(diag,6);

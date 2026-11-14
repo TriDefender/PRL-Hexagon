@@ -88,9 +88,11 @@ ELF 校验：`hexagon-readelf -h` → Flags: 0x75, V75（对照 v79 载荷 0x79,
    4 workers = 6 个并发 `qurt_hvx_lock(128B)` 用户；v79 cDSP 有 8 个 HVX context，
    **v75 cDSP 只有 4 个**（QURT computev75 头：`QURT_HVX_HW_UNITS_4X128B_0X64B
    "V66 CDSP or newer"`），第 5 个锁失败 → worker status=AEE_EFAILED / 等待超时。
-   v75 载荷改为**编译期 2 workers**（`scripts/build-dsp.sh` 的 v75 分支做 define 替换）
-   + 运行时按 `qurt_hvx_get_units()` 自适应上限（kernel_impl.c），2+2=4 恰好用满预算。
-   运行时减少 worker 而不改编译期特化是不可行的（热路径硬编码 4 路由）。
+   v75 载荷改为**编译期 2 workers**（`scripts/build-dsp.sh` 的 v75 分支做 define 替换，
+   替换后断言目标 define 存在，防止 build.conf 漂移导致静默失效）。
+   kernel_impl.c 另有 `qurt_hvx_get_units()` 预算预检（producer + 可选 stage + workers
+   超预算时在启动线程池前 fail-fast）——它是防错栏，不是缩减机制；真正的 worker
+   缩减只发生在编译期（热路径硬编码 4 路由，运行时减池不可行）。
 
 ## 6. 双架构 APK（现按 SoC 目录组织）
 
@@ -122,7 +124,7 @@ ELF 校验：`hexagon-readelf -h` → Flags: 0x75, V75（对照 v79 载荷 0x79,
 ## 7. 回归
 
 - 8 Elite（PLQ110，SM8750/v79）：最终代码以 `PRL_DSP_ARCH=v79` 重建后
-  `APP_CHECK_PASSED`——HVX 自适应 cap 在 v79 上取 8→budget 6→workers 保持 4，行为不变。
+  `APP_CHECK_PASSED`——HVX 预算预检在 v79 上取 8→budget 6→workers 保持 4，行为不变。
 
 ## 8. 兼容性结论与回滚矩阵（最终）
 
@@ -186,7 +188,8 @@ compound skeleton（load time ~5.9ms）、RPC 正常返回。
 
 已知观察：安装后首次启动的 compound 自检曾挂起 >2 分钟（force-stop 后干净重启
 复跑 1.8s 通过，且可稳定复现）。疑似与被杀进程遗留的 DSP 会话状态或首次冷启动
-竞争有关；SelfCheck 的 1200ms 重试未能覆盖该 hang。建议后续给
-`selftestCompound` 的子进程读取加超时强制（timeoutSec 参数已存在但未见强制逻辑）。
+竞争有关。`selftestCompound` 的超时是生效的（默认 90s × 2 次调用 + 1200ms 重试间隔
+≈ 181s，与观察到的 >2 分钟一致），子进程会被 `destroyForcibly()` 终止；待查的是
+首次 compound RPC 为何挂起，而非超时缺失。
 
 双架构互操作不再要求验证（单包单架构自检选择；跨架构编译/验证按设计不做）。

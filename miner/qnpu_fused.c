@@ -438,7 +438,9 @@ static int decode_bytefold_runtime_tag(uint32_t tag, unsigned *mode) {
 
 /* A clock diag slot is either a real query (rc=0, Hz>0) or the DSP-side
  * "unsupported" marker used by pre-v79 firmware whose loader rejects any
- * ELF importing HAP_power_get (HAP_POWER_ERR_UNSUPPORTED_API, Hz=0). */
+ * ELF importing HAP_power_get (HAP_POWER_ERR_UNSUPPORTED_API = -3 from the
+ * SDK's HAP_power.h, mirrored by PRL_CLOCK_RC_UNSUPPORTED below; if the SDK
+ * ever renumbers it, impl.c's stub and this check must change together). */
 static int clock_slot_ok(uint32_t rc_w, uint32_t hz_w) {
     if (rc_w == 0u) return hz_w != 0u;
     return (int32_t)rc_w == PRL_CLOCK_RC_UNSUPPORTED && hz_w == 0u;

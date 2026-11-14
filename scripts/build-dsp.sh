@@ -43,12 +43,21 @@ if [[ "$ARCH" == "v75" ]]; then
   #                         build.conf's value)
   V75_WORKERS="${PRL_V75_WORKERS:-2}"
   V75_ASYNC="${PRL_V75_ASYNC_STAGE:-1}"
+  # The substitutions below match build.conf's exact strings. If build.conf
+  # drifts (worker count bumped, define renamed), a silent no-op would ship
+  # a v75 payload whose worker pool cannot lock — fail loudly instead.
   PRL_KERNEL_DEFINES=("${PRL_KERNEL_DEFINES[@]/-DPRL_GROUP_WORKERS=4/-DPRL_GROUP_WORKERS=$V75_WORKERS}")
+  [[ " ${PRL_KERNEL_DEFINES[*]} " == *" -DPRL_GROUP_WORKERS=$V75_WORKERS "* ]] \
+    || { echo "v75 knob: build.conf no longer defines -DPRL_GROUP_WORKERS=4" >&2; exit 1; }
   if [[ "$V75_ASYNC" != "1" ]]; then
     PRL_KERNEL_DEFINES=("${PRL_KERNEL_DEFINES[@]/-DPRL_ASYNC_STAGE=1/-DPRL_ASYNC_STAGE=0}")
+    [[ " ${PRL_KERNEL_DEFINES[*]} " == *" -DPRL_ASYNC_STAGE=0 "* ]] \
+      || { echo "v75 knob: build.conf no longer defines -DPRL_ASYNC_STAGE=1" >&2; exit 1; }
   fi
   if [[ -n "${PRL_V75_HMX_CLOCK:-}" ]]; then
     PRL_KERNEL_DEFINES=("${PRL_KERNEL_DEFINES[@]/-DPRL_HMX_CLOCK_POLICY=*/-DPRL_HMX_CLOCK_POLICY=$PRL_V75_HMX_CLOCK}")
+    [[ " ${PRL_KERNEL_DEFINES[*]} " == *" -DPRL_HMX_CLOCK_POLICY=$PRL_V75_HMX_CLOCK "* ]] \
+      || { echo "v75 knob: build.conf no longer defines -DPRL_HMX_CLOCK_POLICY=<N>" >&2; exit 1; }
   fi
 fi
 

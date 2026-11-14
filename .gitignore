@@ -1,7 +1,11 @@
 # Build outputs and downloaded toolchains (never commit binaries).
+# Per-SoC payload folders and common/ carry committed READMEs describing the
+# kernel layout; only their build artifacts are ignored.
 /build/
-/common/
-/SM[0-9]*/
+/SM[0-9]*/*
+!/SM[0-9]*/README.md
+/common/*
+!/common/README.md
 /out/
 /deps/
 /app/.gradle/

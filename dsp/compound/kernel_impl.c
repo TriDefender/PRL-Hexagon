@@ -906,16 +906,20 @@ static int fused_run_core(int m,int n,int flags,const byte *X,int XLen,
     if (multi_workers>(unsigned)n/64u) multi_workers=(unsigned)n/64u;
     /* Every concurrent HVX locker needs its own context: the producer band
      * thread, the async stage thread (when active), and each fold pool
-     * worker. v79 (8 Elite) exposes eight contexts, so the stock four-worker
-     * pool plus stage plus producer fits; v75 (8 Gen 3) reports four 128B
-     * units, and the overflow makes a worker's qurt_hvx_lock fail, which the
-     * run reports as AEE_EFAILED. Cap the pool to the queried budget. */
+     * worker. The pools launched below re-derive this same count from
+     * (m,flags), so this budget check is an authoritative pre-flight that
+     * fails the call before any pool starts when the build's compile-time
+     * worker count cannot lock. The real per-SoC fix is compile-time: the
+     * v75 cDSP (SM8650) reports four 128B units against the stock
+     * four-worker pool plus producer plus stage, so scripts/build-dsp.sh
+     * substitutes PRL_GROUP_WORKERS=2 there; v79 (SM8750, eight contexts)
+     * keeps the stock layout. */
     if (g_hvx128) {
         unsigned budget=g_hvx128-1u; /* producer band lock */
 #if PRL_ASYNC_STAGE
         if (use_async_stage(m,flags)&&budget) budget--; /* stage thread lock */
 #endif
-        if (multi_workers>budget) multi_workers=budget;
+        if (multi_workers>budget) return AEE_EFAILED;
     }
     uint32_t need;
 #if PRL_COMPACT_VTCM
