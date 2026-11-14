@@ -15,7 +15,7 @@
 | 分支 | 内核 | 实测吞吐（真实矿池，1 秒窗口） | 说明 |
 |---|---|---|---|
 | `main` | early byte-fold + deep1 / PF0 / G16 | 6.990 / 6.916 TMAC/s（两轮分开统计） | 当前默认：对同组旧 fold 提升 +8.58% / +10.49%，共 158 个完整窗口 |
-| `8gen3/adapt` | 同 main，Hexagon **v75** 构建；双架构 APK | 真机实测 ~3.0–3.1 TMAC/s（短窗） | 面向 Snapdragon 8 Gen 3（SM8650）的架构适配：一个 APK 同时携带 v79+v75 载荷，自检按 SoC 选择并预先装载 |
+| `8gen3/adapt` | 同 main，Hexagon **v75** 构建；双 SoC APK | SM8650 目录内核：真池长测 ~4.17 TMAC/s、20s bench 4.2 TMAC/s（E0 编排，见验证记录 §9） | 面向 Snapdragon 8 Gen 3（SM8650）的架构适配：一个 APK 携带全部受支持 SoC 目录（`SM8750/`、`SM8650/`）的最优载荷，自检按 SoC 选择并预先装载 |
 | `v28` | row-first + L2FETCH，G16 | 7.1–7.4 TMAC/s（历史短窗） | 正式基线版本，长期真机验证最充分 |
 | `v27` | 因子预取 | ≈6.04 TMAC/s | 历史版本 |
 | `v26` | 跨 slice 预取 | ≈5.68 TMAC/s | 历史版本 |
@@ -27,7 +27,7 @@
 
 ## 硬件与系统要求
 
-- SoC：Snapdragon 8 Elite（SM8750，Hexagon v79 cDSP）；`8gen3/adapt` 分支另支持 Snapdragon 8 Gen 3（SM8650，Hexagon v75 cDSP，用 `PRL_DSP_ARCH=v75` 构建 DSP 载荷）
+- SoC：Snapdragon 8 Elite（SM8750，Hexagon v79 cDSP）；`8gen3/adapt` 分支另支持 Snapdragon 8 Gen 3（SM8650，Hexagon v75 cDSP，`PRL_SOC=SM8650` 构建 DSP 载荷）
 - 系统：Android 12（API 31）及以上，arm64
 - 设备需带 `libcdsprpc.so` 与可访问的 FastRPC 设备节点（`/dev/fastrpc-cdsp`，或部分 8 Gen 3 机型仅有的多路复用节点 `/dev/adsprpc-smd`）
 
@@ -63,12 +63,15 @@ app/             Android 应用（Kotlin + Compose）
 miner/           矿工主体（C，stratum + Pearl proof + FastRPC 适配），含 golden 向量与 mock 矿池测试
 dsp/fused/       融合单次路径 DSP skeleton（自检/回退路径）
 dsp/compound/    复合批处理 DSP skeleton（生产路径，版本差异所在）
+SM8750/          Snapdragon 8 Elite 的 DSP 载荷（构建产物 + 说明）
+SM8650/          Snapdragon 8 Gen 3 的 DSP 载荷（构建产物 + 说明）
+common/          架构无关的矿工与 app-check（构建产物 + 说明）
 scripts/         构建脚本（取依赖、DSP、矿工、APK）
 .github/         CI：从源码构建全部载荷并产出/发布 APK
 ```
 
-App 内置**每个受支持架构一套** DSP skeleton（`lib*_skel_v79.so`、`lib*_skel_v75.so`）、一份 `libprlminer.so` 和一个 app-check 检查器，全部由 CI 从源码编译，仓库不含任何二进制产物。
-自检阶段按 SoC 解析架构并把对应一套 skeleton 复制成 FastRPC 规范名（`DspArch.kt` 映射表，`MinerRunner.prepare()` 落盘），`ADSP_LIBRARY_PATH` 只指向选中目录；点击开始挖矿后无需再加载。
+App 内置**每个受支持 SoC 一套** DSP skeleton（`lib*_skel_SM8750.so`、`lib*_skel_SM8650.so`）、一份 `libprlminer.so` 和一个 app-check 检查器，全部由 CI 从源码编译，仓库不含任何二进制产物。
+自检阶段按 SoC 解析载荷组并把对应一套 skeleton 复制成 FastRPC 规范名（`DspArch.kt` 映射表，`MinerRunner.prepare()` 落盘），`ADSP_LIBRARY_PATH` 只指向选中目录；点击开始挖矿后无需再加载。
 miner 每秒输出一次统计行；compound RPC 带 fail-fast 保护，任何 RPC 错误都会停止挖矿而不是提交伪结果。
 
 ## 从源码构建
@@ -86,20 +89,21 @@ Hexagon SDK 6.3.0（含 Hexagon Tools 19.0.04）、HexKL 1.0-beta.2 addon。
 # 1) 拉取工具链到 deps/
 bash scripts/fetch-deps.sh
 
-# 2) 构建每个支持架构的 DSP skeleton 与矿工
+# 2) 构建每个受支持 SoC 的 DSP 载荷与架构无关的矿工
 export HEXAGON_SDK_ROOT=$PWD/deps/hexagon-sdk/6.3.0.0
 export HEXKL_ROOT=$PWD/deps/hexkl/hexkl_addon
 export ANDROID_NDK_ROOT=$PWD/deps/android-ndk-r27c
-bash scripts/build-dsp.sh                                    # v79 -> payloads/
-PRL_DSP_ARCH=v75 PRL_PAYLOAD_DIR="$PWD/payloads-v75" bash scripts/build-dsp.sh   # v75 -> payloads-v75/
-bash scripts/build-miner.sh                                  # ARM 侧，架构无关
+bash scripts/build-dsp.sh                 # SM8750（默认）-> SM8750/
+PRL_SOC=SM8650 bash scripts/build-dsp.sh  # SM8650        -> SM8650/
+bash scripts/build-miner.sh               # ARM 侧        -> common/
 
-# 3) 组装双架构 APK（debug 或 release）
+# 3) 组装 APK（自动 pickup 全部已构建 SoC 目录，debug 或 release）
 bash scripts/build-apk.sh debug
 ```
 
-新增受支持 SoC（如 8 Gen 5 类机型）：`PRL_DSP_ARCH=vNN` 构建一套载荷、`build-apk.sh`
-的 `PAIRS` 与 `DspArch.TARGETS` 各加一行即可。
+新增受支持 SoC（如 8 Gen 5 类机型）：在 `build-dsp.sh` 的 `SOC_TABLE` 与
+`build-apk.sh` 的 `PAIRS` 各加一行、`DspArch.TARGETS` 加一个条目，构建出
+`SMxxxx/` 目录即可自动进 APK。
 
 已有本地工具链时，直接设置对应环境变量即可，无需 `fetch-deps.sh`。
 
@@ -126,7 +130,7 @@ adb shell am start -n com.tridefender.npupearl/.MainActivity
 ```
 
 `miner/tests/` 内含官方 golden 向量与 mock 矿池（`mockpool.py`），可在推送前做离线校验。
-`payloads/app-check` 是实际矿工 adapter 检查器（M=2048,N=64,K=2048）；`payloads/bytefold-batch32-driver` 覆盖生产尺寸 M=2048,N=1024,K=2048 的 32 nonce 全量 commitment/raw TT/digest/mask CPU 对拍。手动运行时设置 `PRL_EXPECT_BYTEFOLD_EARLY=1`，以 payload 目录为 CWD 和分号分隔的 `ADSP_LIBRARY_PATH` 首项；App 已设置相同约束。
+`common/app-check` 是实际矿工 adapter 检查器（M=2048,N=64,K=2048）；`common/bytefold-batch32-driver` 覆盖生产尺寸 M=2048,N=1024,K=2048 的 32 nonce 全量 commitment/raw TT/digest/mask CPU 对拍。手动运行时设置 `PRL_EXPECT_BYTEFOLD_EARLY=1`，以载荷目录（SoC 目录在前）为 CWD 和分号分隔的 `ADSP_LIBRARY_PATH` 首项；App 已设置相同约束。
 
 ## 已知限制
 

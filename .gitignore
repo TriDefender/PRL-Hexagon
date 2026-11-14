@@ -1,7 +1,7 @@
 # Build outputs and downloaded toolchains (never commit binaries).
 /build/
-/payloads/
-/payloads-v*/
+/common/
+/SM[0-9]*/
 /out/
 /deps/
 /app/.gradle/

@@ -68,13 +68,11 @@ jobs:
       - name: Fetch toolchains
         run: bash scripts/fetch-deps.sh
 
-      - name: Build DSP skeletons (v79, Snapdragon 8 Elite)
+      - name: Build DSP payloads (SM8750, Snapdragon 8 Elite)
         run: bash scripts/build-dsp.sh
 
-      - name: Build DSP skeletons (v75, Snapdragon 8 Gen 3)
-        run: |
-          PRL_DSP_ARCH=v75 PRL_PAYLOAD_DIR="$GITHUB_WORKSPACE/payloads-v75" \
-            bash scripts/build-dsp.sh
+      - name: Build DSP payloads (SM8650, Snapdragon 8 Gen 3)
+        run: PRL_SOC=SM8650 bash scripts/build-dsp.sh
 
       - name: Build miner
         run: bash scripts/build-miner.sh
@@ -119,7 +117,8 @@ jobs:
           variant=release
           if [[ "$apk" == *debug* ]]; then variant=debug; fi
           mv "$apk" "dist/prl-npu-miner-${TAG}-${variant}.apk"
-          sha256sum payloads/*.so payloads-v75/*.so dist/*.apk > dist/SHA256SUMS
+          sha256sum SM8750/*.so SM8650/*.so common/libprlminer.so common/app-check \
+            dist/*.apk > dist/SHA256SUMS
           {
             echo "## prl-npu-miner ${TAG} (${GITHUB_REF_NAME})"
             echo

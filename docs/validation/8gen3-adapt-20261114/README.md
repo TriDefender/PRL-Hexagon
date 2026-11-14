@@ -48,10 +48,12 @@ Android 16，kernel 6.1.141-android14，arm64，SELinux enforcing。
 export HEXAGON_SDK_ROOT=…/hexagon-sdk-6.3.0.0
 export HEXKL_ROOT=…/hexkl_addon            # 1.0-beta.2，lib/6.3.0.0 含 hexagon_toolv88_v75
 export ANDROID_NDK_ROOT=…/android-ndk-r27c
-export PRL_DSP_ARCH=v75
-bash scripts/build-dsp.sh                   # 一次通过，无 ISA 错误
-bash scripts/build-miner.sh
+PRL_SOC=SM8650 bash scripts/build-dsp.sh    # -> SM8650/；一次通过，无 ISA 错误
+bash scripts/build-miner.sh                 # -> common/
 ```
+
+（初版接口为 `PRL_DSP_ARCH=v75` 输出 `payloads-v75/`，后随 SoC 目录重组改为
+`PRL_SOC`，见 §6。）
 
 ELF 校验：`hexagon-readelf -h` → Flags: 0x75, V75（对照 v79 载荷 0x79, V79）。
 `check-dsp-elf.py`：PASS（无未解析 hexkl_* 导入）。
@@ -90,18 +92,21 @@ ELF 校验：`hexagon-readelf -h` → Flags: 0x75, V75（对照 v79 载荷 0x79,
    + 运行时按 `qurt_hvx_get_units()` 自适应上限（kernel_impl.c），2+2=4 恰好用满预算。
    运行时减少 worker 而不改编译期特化是不可行的（热路径硬编码 4 路由）。
 
-## 6. 双架构 APK（后续提交）
+## 6. 双架构 APK（现按 SoC 目录组织）
 
-一个 APK 携带全部受支持架构的载荷：
-- 打包：`payloads/`（v79）+ `payloads-v75/`（v75，`PRL_DSP_ARCH=v75` 构建）→
-  `build-apk.sh` 复制为 `lib*_skel_v79.so` / `lib*_skel_v75.so` 进 jniLibs；
-  miner/appcheck 架构无关，只打包一份。`check-dsp-elf.py --arch 0xNN` 在打包时
-  校验每个 skeleton 的 e_flags，防止架构错标。
-- 选择与装载：`DspArch.kt`（SoC→架构映射表，新增 SoC = 表加一行）在自检
-  "手机芯片/手机型号"两步解析架构；`MinerRunner.prepare()` 把对应一套 skeleton
+一个 APK 携带全部受支持 SoC 的载荷，载荷按 SoC 命名的仓库根目录组织：
+- 布局：`SM8750/`（v79）+ `SM8650/`（v75，`PRL_SOC=SM8650` 构建）各存该 SoC
+  最优内核；`common/` 存架构无关 miner/appcheck（`build-miner.sh`）。
+  `build-apk.sh` 按 SoC→e_flags 表自动 pickup 存在的目录，复制为
+  `lib*_skel_SM8750.so` / `lib*_skel_SM8650.so` 进 jniLibs。后缀用 SoC 名而非
+  架构名——两个 SoC 共享同一 Hexagon 目标时仍可携带各自调校的内核。
+  `check-dsp-elf.py --arch 0xNN` 在打包时校验每个 skeleton 的 e_flags，
+  防止架构错标。
+- 选择与装载：`DspArch.kt`（SoC→目标映射表，新增 SoC = 表加一行）在自检
+  "手机芯片/手机型号"两步解析目标；`MinerRunner.prepare()` 把对应一套 skeleton
   复制成规范名到 `filesDir/dsp/`，`ADSP_LIBRARY_PATH='<dspDir>;<nativeDir>'`，
-  只有选中架构可被找到。装载在自检 payload 步完成，点击开始挖矿后无额外加载。
-- CI：release.yml 分别构建两套载荷再打包；发布说明与 SHA256SUMS 覆盖两目录。
+  只有选中 SoC 的载荷可被找到。装载在自检 payload 步完成，点击开始挖矿后无额外加载。
+- CI：release.yml 按 SoC 分别构建再打包；发布说明与 SHA256SUMS 覆盖各目录。
 
 ### 兼容性实测（2026-11-14，8 Elite PLQ110）
 
@@ -111,8 +116,8 @@ ELF 校验：`hexagon-readelf -h` → Flags: 0x75, V75（对照 v79 载荷 0x79,
   目标编译产物）；反向（v79 ELF 于 v75）被固件拒载。因此架构选择只影响
   "能否运行 + 是否最优"：8 Gen 3 必须 v75；8 Elite 优先原生 v79（4 workers），
   误装 v75 也能跑但只有 2 workers。
-- 两台设备的 shell 模拟均通过；App 域（untrusted_app）SELinux 路径待 APK
-  实际安装验证（ColorOS 需在设备上开启"USB 安装"）。
+- 两台设备的 shell 模拟均通过；App 域（untrusted_app）SELinux 路径随后经 APK
+  实际安装验证通过，见 §10。
 
 ## 7. 回归
 

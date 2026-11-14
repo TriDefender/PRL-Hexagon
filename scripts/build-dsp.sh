@@ -3,12 +3,25 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SDK="${HEXAGON_SDK_ROOT:?set HEXAGON_SDK_ROOT to a Hexagon SDK 6.3 install}"
 HK="${HEXKL_ROOT:?set HEXKL_ROOT to a hexkl_addon 1.0-beta.2 tree}"
-OUT="${PRL_PAYLOAD_DIR:-$ROOT/payloads}"
 BUILD="${PRL_BUILD_DIR:-$ROOT/build}"
-# Target compute DSP architecture: v79 (Snapdragon 8 Elite, SM8750) or
-# v75 (Snapdragon 8 Gen 3, SM8650). 8 Gen 3's cDSP is Hexagon v75, with a
-# v73 backward-compatibility target; the payload ELF must match the device.
-ARCH="${PRL_DSP_ARCH:-v79}"
+# Payloads are organized per SoC: each supported Snapdragon gets a repo-root
+# folder holding its best kernel build, and the release packaging picks up
+# every folder in the table below automatically (scripts/build-apk.sh).
+#   PRL_SOC=SM8750 -> Hexagon v79 (Snapdragon 8 Elite)
+#   PRL_SOC=SM8650 -> Hexagon v75 (Snapdragon 8 Gen 3)
+# Supporting a future SoC: add it to this table, build into its folder, and
+# the app's DspArch table picks it at self-check.
+SOC_TABLE=(
+  "SM8750:v79"
+  "SM8650:v75"
+)
+SOC="${PRL_SOC:-SM8750}"
+ARCH=""
+for entry in "${SOC_TABLE[@]}"; do
+  if [[ "${entry%%:*}" == "$SOC" ]]; then ARCH="${entry#*:}"; fi
+done
+[[ -n "$ARCH" ]] || { echo "unknown PRL_SOC '$SOC' (supported: ${SOC_TABLE[*]%%:*})" >&2; exit 1; }
+OUT="${PRL_PAYLOAD_DIR:-$ROOT/$SOC}"
 UDMA="$SDK/addons/compute/libs/userdma/utils_lib"
 TOOLS="$SDK/tools/HEXAGON_Tools/19.0.04/Tools/bin"
 HEX="$TOOLS/hexagon-clang"

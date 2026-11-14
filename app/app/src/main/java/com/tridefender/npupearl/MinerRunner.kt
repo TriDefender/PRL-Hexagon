@@ -51,10 +51,11 @@ class MinerRunner(ctx: Context) {
     val nativeDir: String get() = appCtx.applicationInfo.nativeLibraryDir
 
     /**
-     * Staged canonical DSP skeletons for this device's arch. The APK packs one
-     * skeleton set per arch under an arch suffix; prepare() copies the set the
-     * self-check selected into dspDir under the names FastRPC expects, and
-     * dspDir leads ADSP_LIBRARY_PATH so only that arch can load.
+     * Staged canonical DSP skeletons for this device's SoC. The APK packs one
+     * skeleton set per supported SoC under a SoC suffix (mirroring the repo's
+     * SM-prefixed payload folders); prepare() copies the set the self-check
+     * selected into dspDir under the names FastRPC expects, and dspDir leads
+     * ADSP_LIBRARY_PATH so only that SoC's payload can load.
      */
     val dspDir: File get() = File(appCtx.filesDir, "dsp")
     val arch: DspArch.Target? by lazy { DspArch.forThisDevice() }
@@ -71,7 +72,7 @@ class MinerRunner(ctx: Context) {
             val a = arch ?: return false
             return DspArch.canonicalSkels.all {
                 File(dspDir, it).exists() &&
-                    File(nativeDir, DspArch.packedSkel(a.arch, it)).exists()
+                    File(nativeDir, DspArch.packedSkel(a.soc, it)).exists()
             }
         }
 
@@ -85,7 +86,7 @@ class MinerRunner(ctx: Context) {
             val a = arch ?: return false
             dspDir.mkdirs()
             for (canonical in DspArch.canonicalSkels) {
-                File(nativeDir, DspArch.packedSkel(a.arch, canonical)).inputStream().use { ins ->
+                File(nativeDir, DspArch.packedSkel(a.soc, canonical)).inputStream().use { ins ->
                     File(dspDir, canonical).outputStream().use { os -> ins.copyTo(os) }
                 }
             }
