@@ -1,6 +1,6 @@
-# PRL NPU Miner（Pearl · Snapdragon 8 Elite）
+# PRL NPU Miner（Pearl · Qualcomm Hexagon）
 
-在骁龙 8 Elite（SM8750）的 Hexagon v79 NPU（cDSP，HVX + HMX）上挖 Pearl（PRL）的 Android 应用。
+在新款高通手机上利用AI协处理器挖 Pearl（PRL）的 Android 应用。
 矿工作为普通 App 运行，通过 Hexagon FastRPC 直接调用 NPU，**不需要 root、Shizuku 或 adb**。
 
 - 界面：Kotlin + Jetpack Compose（Material 3 蓝黑主题）
